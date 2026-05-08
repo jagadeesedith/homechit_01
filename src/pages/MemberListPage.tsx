@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useChitFund } from '../context/ChitFundContext';
 import { formatINR } from '@/lib/utils';
 import { Plus, Pencil, Trash2, Search, X } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 interface MemberFormData {
   name: string;
@@ -14,10 +15,11 @@ export function MemberListPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingMember, setEditingMember] = useState<string | null>(null);
   const [formData, setFormData] = useState<MemberFormData>({ name: '', phone: '' });
+  const [isImporting , setIsImporting] = useState(false);
 
   const filteredMembers = state.members.filter(m =>
     m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    m.id.toLowerCase().includes(searchQuery.toLowerCase())
+    (m.id || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -50,9 +52,72 @@ export function MemberListPage() {
     setShowForm(true);
   };
 
+  const handleFileUpload = async (
+  e: React.ChangeEvent<HTMLInputElement>
+) => {
+
+  const file =
+    e.target.files?.[0];
+
+  if (!file) return;
+
+  setIsImporting(true);
+
+  try {
+
+    const data =
+      await file.arrayBuffer();
+
+    const workbook =
+      XLSX.read(data);
+
+    const sheet =
+      workbook.Sheets[
+        workbook.SheetNames[0]
+      ];
+
+    const jsonData =
+      XLSX.utils.sheet_to_json<{
+  Name: string;
+  Phone: string;
+}>(
+        sheet
+      );
+
+    for (const item of jsonData) {
+
+      if (
+        !item.Name ||
+        !item.Phone
+      ) continue;
+
+      await addMember({
+        name: String(item.Name),
+        phone: String(item.Phone),
+      });
+    }
+
+    alert(
+      'Members imported successfully'
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    alert(
+      'Import failed'
+    );
+
+  } finally {
+
+    setIsImporting(false);
+  }
+};
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-6">
         <h1 className="text-2xl font-semibold text-[#1d1d1d]">Member List ({state.members.length})</h1>
         <button
           onClick={handleAddNew}
@@ -61,6 +126,21 @@ export function MemberListPage() {
           <Plus className="w-4 h-4" />
           Add Member
         </button>
+
+        <label className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg cursor-pointer hover:bg-emerald-700 transition-colors">
+
+  {isImporting
+  ? 'Importing...'
+  : 'Import Excel'}
+
+  <input
+    type="file"
+    accept=".xlsx,.csv"
+    onChange={handleFileUpload}
+    className="hidden"
+  />
+
+</label>
       </div>
 
       {showForm && (

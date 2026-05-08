@@ -1,14 +1,17 @@
 import { createContext, useContext, useReducer, useEffect, type ReactNode } from 'react';
 import type { Member, MonthlyPayment, Distribution, Settings } from '@/types';
 import {
-  getMembers, setMembers,
+   setMembers,
   getPayments, setPayments,
   getDistributions, setDistributions,
   getSettings, setSettings,
-  seedInitialData,
+  
 } from '@/lib/storage';
 import { generateId } from '@/lib/utils';
-
+import {
+  addMemberToFirestore,
+  getMembersFromFirestore
+} from '@/lib/firestore';
 interface State {
   members: Member[];
   payments: MonthlyPayment[];
@@ -102,7 +105,7 @@ function reducer(state: State, action: Action): State {
 interface ContextValue {
   state: State;
   dispatch: React.Dispatch<Action>;
-  addMember: (member: Omit<Member, 'id' | 'joinDate' | 'balance'>) => void;
+  addMember: (member: Omit<Member, 'id' | 'joinDate' | 'balance'>) => Promise<void>;
   updateMember: (member: Member) => void;
   deleteMember: (id: string) => void;
   recordPayment: (memberId: string, month: number, year: number, principalPaid: number) => MonthlyPayment | null;
@@ -127,26 +130,47 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
-    seedInitialData();
 
-    const members = getMembers();
-    const payments = getPayments();
-    const distributions = getDistributions();
-    const settings = getSettings() || defaultSettings;
+  const loadData = async () => {
+
+    const members =
+      await getMembersFromFirestore();
+
+    const payments =
+      getPayments();
+
+    const distributions =
+      getDistributions();
+
+    const settings =
+      getSettings() ||
+      defaultSettings;
 
     dispatch({
       type: 'LOAD_DATA',
-      payload: { members, payments, distributions, settings },
-    });
-  }, []);
 
-  const addMember = (memberData: Omit<Member, 'id' | 'joinDate' | 'balance'>) => {
+      payload: {
+        members,
+        payments,
+        distributions,
+        settings,
+      },
+    });
+  };
+
+  loadData();
+
+}, []);
+
+  const addMember = async (memberData: Omit<Member, 'id' | 'joinDate' | 'balance'>) => {
     const newMember: Member = {
       ...memberData,
       balance: 0,
       id: generateId(),
       joinDate: new Date().toISOString().split('T')[0],
     };
+
+    await addMemberToFirestore(newMember);
 
     dispatch({ type: 'ADD_MEMBER', payload: newMember });
   };
