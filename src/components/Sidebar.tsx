@@ -1,4 +1,7 @@
+import { useState } from 'react';
+
 import { Link, useLocation } from 'react-router-dom';
+
 import {
   LayoutDashboard,
   CalendarRange,
@@ -8,90 +11,257 @@ import {
   Settings,
   LogOut,
   Coins,
+  Menu,
+  X,
 } from 'lucide-react';
+
 import { useAuth } from '@/hooks/useAuth';
 
 const navItems = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/monthly-summary', label: 'Monthly Summary', icon: CalendarRange },
-  { path: '/member-history', label: 'Member History', icon: History },
-  { path: '/distribution', label: 'Distribution', icon: HandCoins },
-  { path: '/members', label: 'Member List', icon: Users },
-  { path: '/settings', label: 'Settings', icon: Settings },
+  {
+    path: '/',
+    label: 'Dashboard',
+    icon: LayoutDashboard
+  },
+  {
+    path: '/monthly-summary',
+    label: 'Monthly Summary',
+    icon: CalendarRange
+  },
+  {
+    path: '/member-history',
+    label: 'Member History',
+    icon: History
+  },
+  {
+    path: '/distribution',
+    label: 'Distribution',
+    icon: HandCoins
+  },
+  {
+    path: '/members',
+    label: 'Member List',
+    icon: Users
+  },
+  {
+    path: '/settings',
+    label: 'Settings',
+    icon: Settings
+  },
 ];
 
 export function Sidebar() {
+
   const location = useLocation();
+
   const { logout } = useAuth();
 
+  const [isOpen, setIsOpen] =
+    useState(false);
+
   return (
+
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-[280px] min-h-screen flex-col fixed left-0 top-0 border-r border-white/10 bg-gradient-to-b from-slate-900 to-blue-950 text-white/90 backdrop-blur-xl">
+      <aside className="hidden lg:flex w-[280px] min-h-screen flex-col fixed left-0 top-0 border-r border-white/10 bg-gradient-to-b from-slate-900 to-blue-950 text-white/90">
+
         <div className="p-6 border-b border-white/10 bg-white/5">
+
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/25 ring-1 ring-white/10">
+
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
+
               <Coins className="w-5 h-5 text-white" />
+
             </div>
 
-            <span className="text-lg font-semibold tracking-tight text-white">Chit Fund Manager</span>
+            <span className="text-lg font-semibold text-white">
+              Chit Fund Manager
+            </span>
+
           </div>
+
         </div>
 
         <nav className="flex-1 p-4 space-y-1">
+
           {navItems.map((item) => {
-            const isActive = location.pathname === item.path;
+
+            const isActive =
+              location.pathname === item.path;
+
             const Icon = item.icon;
+
             return (
+
               <Link
                 key={item.path}
                 to={item.path}
                 className={`
-                  flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-all duration-200 transform-gpu hover:-translate-y-[1px] hover:shadow-sm
+                  flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all duration-200
+
                   ${isActive
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium shadow-lg shadow-blue-600/20 ring-1 ring-white/10'
-                    : 'text-white/60 hover:bg-white/10 hover:text-white'
-                  }
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
+                    : 'text-white/70 hover:bg-white/10 hover:text-white'}
                 `}
               >
-                <Icon className="w-4 h-4 transition-all duration-200 ${isActive ? 'text-white' : 'text-white/70'}" />
+
+                <Icon className="w-5 h-5" />
+
                 {item.label}
+
               </Link>
             );
           })}
+
         </nav>
 
-        <div className="p-4 border-t border-white/10 bg-white/5">
+        <div className="p-4 border-t border-white/10">
+
           <button
             onClick={logout}
-            className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-white/70 hover:bg-white/10 hover:text-white transition-all duration-200 w-full min-h-[44px]"
+            className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-white/70 hover:bg-white/10 hover:text-white transition-all duration-200 w-full"
           >
-            <LogOut className="w-4 h-4 text-white/80" />
+
+            <LogOut className="w-5 h-5" />
+
             Logout
+
           </button>
+
         </div>
+
       </aside>
 
-      {/* Mobile Top Bar (Hamburger / Overlay) */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40">
-        <div className="h-14 flex items-center gap-3 px-4 bg-gradient-to-b from-slate-900 to-blue-950 text-white/95 backdrop-blur-xl border-b border-white/10">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/25 ring-1 ring-white/10 flex-none">
+      {/* Mobile Topbar */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 h-14 flex items-center justify-between px-4 bg-gradient-to-b from-slate-900 to-blue-950 border-b border-white/10">
+
+        <div className="flex items-center gap-3">
+
+          <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
+
             <Coins className="w-5 h-5 text-white" />
+
           </div>
-          <div className="flex-1 min-w-0">
-            <span className="text-sm font-semibold tracking-tight text-white truncate">Chit Fund Manager</span>
-          </div>
-          {/* Drawer trigger placeholder (keeps existing logic untouched) */}
-          <span className="text-white/70"> </span>
+
+          <span className="text-sm font-semibold text-white">
+            Chit Fund Manager
+          </span>
+
         </div>
+
+        {/* Hamburger Button */}
+        <button
+          onClick={() =>
+            setIsOpen(!isOpen)
+          }
+          className="text-white"
+        >
+
+          {isOpen
+            ? <X className="w-6 h-6" />
+            : <Menu className="w-6 h-6" />}
+
+        </button>
+
       </div>
 
-      {/* Mobile Drawer (Overlay) */}
-      <div className="lg:hidden fixed inset-0 z-50 overflow-hidden">
-        {/* Currently collapsed by default; selecting a nav link will navigate away. */}
-        <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity duration-200" />
-        <aside className="w-[280px] h-screen border-r border-white/10 bg-gradient-to-b from-slate-900 to-blue-950 text-white/90 backdrop-blur-xl fixed left-0 top-0 -translate-x-full" />
-      </div>
+      {/* Overlay */}
+      {isOpen && (
+
+        <div
+          className="lg:hidden fixed inset-0 bg-black/50 z-40"
+          onClick={() =>
+            setIsOpen(false)
+          }
+        />
+
+      )}
+
+      {/* Mobile Sidebar */}
+      <aside
+        className={`
+          lg:hidden fixed top-0 left-0 z-50 h-full w-[280px]
+          bg-gradient-to-b from-slate-900 to-blue-950
+          border-r border-white/10
+          transform transition-transform duration-300
+
+          ${isOpen
+            ? 'translate-x-0'
+            : '-translate-x-full'}
+        `}
+      >
+
+        <div className="p-6 border-b border-white/10">
+
+          <div className="flex items-center justify-between">
+
+            <div className="flex items-center gap-3">
+
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
+
+                <Coins className="w-5 h-5 text-white" />
+
+              </div>
+
+              <span className="text-lg font-semibold text-white">
+                Chit Fund Manager
+              </span>
+
+            </div>
+
+            <button
+              onClick={() =>
+                setIsOpen(false)
+              }
+              className="text-white"
+            >
+
+              <X className="w-6 h-6" />
+
+            </button>
+
+          </div>
+
+        </div>
+
+        <nav className="flex-1 p-4 space-y-1">
+
+          {navItems.map((item) => {
+
+            const isActive =
+              location.pathname === item.path;
+
+            const Icon = item.icon;
+
+            return (
+
+              <Link
+                key={item.path}
+                to={item.path}
+                onClick={() =>
+                  setIsOpen(false)
+                }
+                className={`
+                  flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all duration-200
+
+                  ${isActive
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
+                    : 'text-white/70 hover:bg-white/10 hover:text-white'}
+                `}
+              >
+
+                <Icon className="w-5 h-5" />
+
+                {item.label}
+
+              </Link>
+            );
+          })}
+
+        </nav>
+
+      </aside>
     </>
   );
 }
