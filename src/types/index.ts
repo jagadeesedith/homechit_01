@@ -34,7 +34,10 @@ export interface Settings {
   interestRate: number;
   durationMonths: number;
   totalMembers: number;
+  startMonth: number;
+  startYear: number;
 }
+
 
 export const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',

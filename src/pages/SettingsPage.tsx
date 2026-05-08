@@ -1,15 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { useChitFund } from '@/context/ChitFundContext';
 import { Settings as SettingsIcon, Check } from 'lucide-react';
 
 export function SettingsPage() {
   const { state, updateSettings } = useChitFund();
-  const [form, setForm] = useState(state.settings);
+  const initialForm = useMemo(() => state.settings, [state.settings]);
+  const [form, setForm] = useState(initialForm);
   const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    setForm(state.settings);
-  }, [state.settings]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,7 +42,9 @@ export function SettingsPage() {
               onChange={(e) => setForm({ ...form, firstMonthAmount: Number(e.target.value) })}
               className="w-full text-sm rounded-lg border border-[#e9ecef] p-2.5 focus:outline-none focus:ring-2 focus:ring-[#004b87]"
             />
-            <p className="text-xs text-[#6c757d] mt-1">Special amount for the first month (e.g., ₹2,000)</p>
+            <p className="text-xs text-[#6c757d] mt-1">
+              Special amount for the first month (e.g., ₹2,000)
+            </p>
           </div>
 
           <div>
@@ -63,9 +62,7 @@ export function SettingsPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#1d1d1d] mb-1.5">
-              Interest Rate (%)
-            </label>
+            <label className="block text-sm font-medium text-[#1d1d1d] mb-1.5">Interest Rate (%)</label>
             <input
               type="number"
               min="0"
@@ -79,9 +76,39 @@ export function SettingsPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#1d1d1d] mb-1.5">
-              Duration (Months)
-            </label>
+            <label className="block text-sm font-medium text-[#1d1d1d] mb-1.5">Starting Month</label>
+            <select
+              value={form.startMonth}
+              onChange={(e) => setForm({ ...form, startMonth: Number(e.target.value) })}
+              className="w-full text-sm rounded-lg border border-[#e9ecef] p-2.5 focus:outline-none focus:ring-2 focus:ring-[#004b87]"
+            >
+              <option value={1}>January</option>
+              <option value={2}>February</option>
+              <option value={3}>March</option>
+              <option value={4}>April</option>
+              <option value={5}>May</option>
+              <option value={6}>June</option>
+              <option value={7}>July</option>
+              <option value={8}>August</option>
+              <option value={9}>September</option>
+              <option value={10}>October</option>
+              <option value={11}>November</option>
+              <option value={12}>December</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[#1d1d1d] mb-1.5">Starting Year</label>
+            <input
+              type="number"
+              value={form.startYear}
+              onChange={(e) => setForm({ ...form, startYear: Number(e.target.value) })}
+              className="w-full text-sm rounded-lg border border-[#e9ecef] p-2.5 focus:outline-none focus:ring-2 focus:ring-[#004b87]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[#1d1d1d] mb-1.5">Duration (Months)</label>
             <input
               type="number"
               min="1"
@@ -94,9 +121,7 @@ export function SettingsPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#1d1d1d] mb-1.5">
-              Total Members
-            </label>
+            <label className="block text-sm font-medium text-[#1d1d1d] mb-1.5">Total Members</label>
             <input
               type="number"
               min="1"
@@ -128,3 +153,4 @@ export function SettingsPage() {
     </div>
   );
 }
+

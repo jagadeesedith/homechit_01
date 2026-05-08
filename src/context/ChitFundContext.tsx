@@ -25,6 +25,16 @@ type Action =
   | { type: 'ADD_DISTRIBUTION'; payload: Distribution }
   | { type: 'UPDATE_SETTINGS'; payload: Settings };
 
+const defaultSettings: Settings = {
+  firstMonthAmount: 2000,
+  monthlyAmount: 500,
+  interestRate: 2,
+  durationMonths: 36,
+  totalMembers: 60,
+  startMonth: 4,
+  startYear: 2026,
+};
+
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'LOAD_DATA':
@@ -37,7 +47,7 @@ function reducer(state: State, action: Action): State {
     }
 
     case 'UPDATE_MEMBER': {
-      const updated = state.members.map(m => m.id === action.payload.id ? action.payload : m);
+      const updated = state.members.map(m => (m.id === action.payload.id ? action.payload : m));
       setMembers(updated);
       return { ...state, members: updated };
     }
@@ -92,14 +102,6 @@ interface ContextValue {
 
 const ChitFundContext = createContext<ContextValue | null>(null);
 
-const defaultSettings: Settings = {
-  firstMonthAmount: 2000,
-  monthlyAmount: 500,
-  interestRate: 2,
-  durationMonths: 36,
-  totalMembers: 60,
-};
-
 export function ChitFundProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, {
     members: [],
@@ -110,10 +112,12 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     seedInitialData();
+
     const members = getMembers();
     const payments = getPayments();
     const distributions = getDistributions();
     const settings = getSettings() || defaultSettings;
+
     dispatch({
       type: 'LOAD_DATA',
       payload: { members, payments, distributions, settings },
@@ -127,6 +131,7 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
       id: generateId(),
       joinDate: new Date().toISOString().split('T')[0],
     };
+
     dispatch({ type: 'ADD_MEMBER', payload: newMember });
   };
 
@@ -147,24 +152,32 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
     const member = state.members.find(m => m.id === memberId);
     if (!member) return null;
 
-    const isFirstMonth = month === 1 && year === new Date().getFullYear();
-    const contribution = isFirstMonth ? state.settings.firstMonthAmount : state.settings.monthlyAmount;
-    const interest = (member.balance * state.settings.interestRate) / 100;
-    const totalPaid = contribution + principalPaid + interest;
-    const newBalance = member.balance - principalPaid;
+    const isFirstMonth =
+  month === state.settings.startMonth &&
+  year === state.settings.startYear;
 
-    const payment: MonthlyPayment = {
-      id: generateId(),
-      memberId,
-      month,
-      year,
-      contribution,
-      principalPaid,
-      interest,
-      totalPaid,
-      newBalance,
-      paidAt: new Date().toISOString(),
-    };
+const amount = isFirstMonth
+  ? state.settings.firstMonthAmount
+  : state.settings.monthlyAmount;
+
+const interest = (member.balance * state.settings.interestRate) / 100;
+
+const totalPaid = amount + principalPaid + interest;
+
+const newBalance = member.balance - principalPaid;
+
+const payment: MonthlyPayment = {
+  id: generateId(),
+  memberId,
+  month,
+  year,
+  contribution: amount,
+  principalPaid,
+  interest,
+  totalPaid,
+  newBalance,
+  paidAt: new Date().toISOString(),
+};
 
     const updatedMember: Member = {
       ...member,
@@ -184,6 +197,7 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
       amount,
       givenAt: new Date().toISOString(),
     };
+
     dispatch({ type: 'ADD_DISTRIBUTION', payload: distribution });
   };
 
@@ -220,7 +234,9 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
   };
 
   const getContributionAmount = (month: number, year: number) => {
-    const isFirstMonth = month === 1 && year === new Date().getFullYear();
+    const isFirstMonth =
+      month === state.settings.startMonth && year === state.settings.startYear;
+
     return isFirstMonth ? state.settings.firstMonthAmount : state.settings.monthlyAmount;
   };
 
@@ -252,3 +268,4 @@ export function useChitFund(): ContextValue {
   if (!ctx) throw new Error('useChitFund must be used within ChitFundProvider');
   return ctx;
 }
+

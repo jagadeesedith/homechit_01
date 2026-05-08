@@ -81,7 +81,10 @@ export function seedInitialData(): void {
       interestRate: 2,
       durationMonths: 36,
       totalMembers: 60,
+      startMonth: 4,
+      startYear: 2026,
     };
+
     setSettings(defaultSettings);
 
     const members: Member[] = Array.from({ length: 60 }, (_, i) => {

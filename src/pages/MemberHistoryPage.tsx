@@ -58,7 +58,7 @@ export function MemberHistoryPage() {
 
       {member && (
         <>
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <div className="bg-white p-5 rounded-lg border border-[#e9ecef]">
               <p className="text-xs text-[#6c757d] font-medium uppercase">Current Balance</p>
               <p className="text-xl font-bold text-[#1d1d1d] mt-1">{formatINR(member.balance)}</p>

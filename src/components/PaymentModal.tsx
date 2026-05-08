@@ -17,8 +17,12 @@ export function PaymentModal({ memberId, month, year, onClose }: PaymentModalPro
   const member = state.members.find(m => m.id === memberId);
   const isAlreadyPaid = hasMemberPaid(memberId, month, year);
 
-  const isFirstMonth = month === 1 && year === new Date().getFullYear();
-  const contribution = isFirstMonth ? state.settings.firstMonthAmount : state.settings.monthlyAmount;
+  const isFirstMonth =
+    month === state.settings.startMonth && year === state.settings.startYear;
+  const contribution = isFirstMonth
+    ? state.settings.firstMonthAmount
+    : state.settings.monthlyAmount;
+
   const lastBalance = member?.balance ?? 0;
 
   const principalNum = parseFloat(principalPaid) || 0;
@@ -38,22 +42,41 @@ export function PaymentModal({ memberId, month, year, onClose }: PaymentModalPro
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
       <div
-        className="bg-white w-[480px] rounded-lg shadow-lg p-6 animate-in fade-in zoom-in-95 duration-200"
+        className="bg-gradient-to-br from-white to-blue-50 w-full max-w-[520px] mx-4 rounded-3xl shadow-2xl border border-blue-100 p-7 animate-in fade-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-[#1d1d1d]">
-            {isAlreadyPaid ? 'Payment Details' : 'Collect Payment'} - {member.id}
-          </h3>
+          <div>
+            <h3 className="text-2xl font-bold text-slate-800">
+              💰 Collect Payment
+            </h3>
+            <p className="text-sm text-slate-500 mt-1">
+              {member.id} • {member.name}
+            </p>
+          </div>
+
           <button
             onClick={onClose}
-            className="p-1 rounded hover:bg-[#f8f9fa] transition-colors"
+            className="w-10 h-10 rounded-full bg-red-50 hover:bg-red-100 flex items-center justify-center transition"
           >
-            <X className="w-5 h-5 text-[#6c757d]" />
+            <X className="w-5 h-5 text-red-500" />
           </button>
         </div>
 
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+          <div className="bg-blue-100 rounded-2xl p-4">
+            <p className="text-xs text-blue-700 font-medium">Monthly Contribution</p>
+            <p className="text-2xl font-bold text-blue-900 mt-1">{formatINR(contribution)}</p>
+          </div>
+
+          <div className="bg-orange-100 rounded-2xl p-4">
+            <p className="text-xs text-orange-700 font-medium">Interest</p>
+            <p className="text-2xl font-bold text-orange-900 mt-1">{formatINR(interest)}</p>
+          </div>
+        </div>
+
         <div className="space-y-4">
+
           <div>
             <label className="text-xs text-[#6c757d] font-medium uppercase tracking-wider">Member Name</label>
             <p className="text-sm text-[#1d1d1d] font-medium mt-1">{member.name}</p>
@@ -87,6 +110,23 @@ export function PaymentModal({ memberId, month, year, onClose }: PaymentModalPro
                   className="mt-1 w-full text-sm rounded border border-[#e9ecef] p-2.5 focus:outline-none focus:ring-2 focus:ring-[#004b87] focus:border-transparent"
                   autoFocus
                 />
+                <div className="flex flex-wrap gap-2 mt-3">
+  {[0, 1000, 2000, 5000].map((amount) => (
+    <button
+      key={amount}
+      type="button"
+      onClick={() => setPrincipalPaid(String(amount))}
+      className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all
+        ${
+          principalPaid === String(amount)
+            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
+            : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+        }`}
+    >
+      ₹{amount}
+    </button>
+  ))}
+</div>
               </div>
 
               <div className="mt-4">
@@ -108,7 +148,7 @@ export function PaymentModal({ memberId, month, year, onClose }: PaymentModalPro
                 <p className="text-sm font-semibold text-[#1d1d1d] mt-1">{formatINR(newBalance)}</p>
               </div>
 
-              <div className="flex gap-3 mt-6">
+              <div className="flex flex-col sm:flex-row gap-3 mt-6">
                 <button
                   type="button"
                   onClick={onClose}
