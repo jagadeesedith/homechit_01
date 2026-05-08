@@ -1,4 +1,4 @@
-import { useChitFund } from '@/context/ChitFundContext';
+import { useChitFund } from '../context/ChitFundContext';
 
 interface MemberBoxProps {
   memberId: string;

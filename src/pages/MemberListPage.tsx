@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useChitFund } from '@/context/ChitFundContext';
+import { useChitFund } from '../context/ChitFundContext';
 import { formatINR } from '@/lib/utils';
 import { Plus, Pencil, Trash2, Search, X } from 'lucide-react';
 

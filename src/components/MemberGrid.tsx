@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useChitFund } from '@/context/ChitFundContext';
+import { useChitFund } from '../context/ChitFundContext';
 import { MemberBox } from './MemberBox';
 import { PaymentModal } from './PaymentModal';
 

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useChitFund } from '@/context/ChitFundContext';
+import { useChitFund } from '../context/ChitFundContext';
 import { Settings as SettingsIcon, Check } from 'lucide-react';
 
 export function SettingsPage() {

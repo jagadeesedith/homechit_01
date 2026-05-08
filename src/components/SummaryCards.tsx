@@ -1,4 +1,4 @@
-import { useChitFund } from '@/context/ChitFundContext';
+import { useChitFund } from '../context/ChitFundContext';
 import { formatINR } from '@/lib/utils';
 import { Wallet, AlertCircle, Banknote, TrendingUp } from 'lucide-react';
 

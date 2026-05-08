@@ -1,22 +1,75 @@
-import { useState, useCallback } from 'react';
-import { isAuthenticated, setAuthenticated, logout as doLogout } from '@/lib/storage';
+import {
+  signInWithPopup,
+  signOut,
+  onAuthStateChanged,
+  type User
+} from 'firebase/auth';
+
+import {
+  useEffect,
+  useState
+} from 'react';
+
+import {
+  auth,
+  googleProvider
+} from '../lib/firebase';
 
 export function useAuth() {
-  const [auth, setAuth] = useState(isAuthenticated);
 
-  const login = useCallback((username: string, password: string): boolean => {
-    if (username === 'admin' && password === 'admin') {
-      setAuthenticated(true);
-      setAuth(true);
-      return true;
-    }
-    return false;
+  const [user, setUser] =
+    useState<User | null>(null);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  useEffect(() => {
+
+    const unsubscribe =
+      onAuthStateChanged(
+        auth,
+        (currentUser) => {
+
+          setUser(currentUser);
+
+          setLoading(false);
+        }
+      );
+
+    return () => unsubscribe();
+
   }, []);
 
-  const logout = useCallback(() => {
-    doLogout();
-    setAuth(false);
-  }, []);
+  const googleLogin =
+    async () => {
 
-  return { isAuthenticated: auth, login, logout };
+      try {
+
+        await signInWithPopup(
+          auth,
+          googleProvider
+        );
+
+        return true;
+
+      } catch (error) {
+
+        console.error(error);
+
+        return false;
+      }
+    };
+
+  const logout = async () => {
+
+    await signOut(auth);
+  };
+
+  return {
+    user,
+    loading,
+    isAuthenticated: !!user,
+    googleLogin,
+    logout
+  };
 }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { SummaryCards } from '@/components/SummaryCards';
 import { MemberGrid } from '@/components/MemberGrid';
 import { MONTHS } from '@/types';
-import { useChitFund } from '@/context/ChitFundContext';
+import { useChitFund } from '../context/ChitFundContext';
 
 export function DashboardPage() {
   const { state } = useChitFund();
