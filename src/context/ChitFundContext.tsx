@@ -23,6 +23,7 @@ type Action =
   | { type: 'DELETE_MEMBER'; payload: string }
   | { type: 'RECORD_PAYMENT'; payload: { payment: MonthlyPayment; updatedMember: Member } }
   | { type: 'ADD_DISTRIBUTION'; payload: Distribution }
+  | { type: 'MARK_ALL_PAID'; payload: MonthlyPayment[];  }
   | { type: 'UPDATE_SETTINGS'; payload: Settings };
 
 const defaultSettings: Settings = {
@@ -79,6 +80,20 @@ function reducer(state: State, action: Action): State {
       return { ...state, settings: action.payload };
     }
 
+    case 'MARK_ALL_PAID': {
+
+  const updatedPayments = [
+    ...state.payments,
+    ...action.payload
+  ];
+
+  setPayments(updatedPayments);
+
+  return {
+    ...state,
+    payments: updatedPayments
+  };
+}
     default:
       return state;
   }
@@ -86,6 +101,7 @@ function reducer(state: State, action: Action): State {
 
 interface ContextValue {
   state: State;
+  dispatch: React.Dispatch<Action>;
   addMember: (member: Omit<Member, 'id' | 'joinDate' | 'balance'>) => void;
   updateMember: (member: Member) => void;
   deleteMember: (id: string) => void;
@@ -244,6 +260,7 @@ const payment: MonthlyPayment = {
     <ChitFundContext.Provider
       value={{
         state,
+        dispatch,
         addMember,
         updateMember,
         deleteMember,

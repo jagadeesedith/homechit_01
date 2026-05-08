@@ -18,6 +18,7 @@ export function DistributionPage() {
   const [selectedMember, setSelectedMember] = useState('');
   const [amount, setAmount] = useState(String(totalCollected));
 
+  
   const handleGiveLoan = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedMember || !amount) return;
