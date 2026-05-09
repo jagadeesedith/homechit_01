@@ -1,17 +1,22 @@
-import { createContext, useContext, useReducer, useEffect, type ReactNode } from 'react';
-import type { Member, MonthlyPayment, Distribution, Settings } from '@/types';
 import {
-   setMembers,
-  getPayments, setPayments,
-  getDistributions, setDistributions,
-  getSettings, setSettings,
-  
-} from '@/lib/storage';
-import { generateId } from '@/lib/utils';
+  createContext,
+  useContext,
+  useReducer,
+  useEffect,
+  type ReactNode,
+} from "react";
+import type { Member, MonthlyPayment, Distribution, Settings } from "@/types";
 import {
-  addMemberToFirestore,
-  getMembersFromFirestore
-} from '@/lib/firestore';
+  setMembers,
+  getPayments,
+  setPayments,
+  getDistributions,
+  setDistributions,
+  getSettings,
+  setSettings,
+} from "@/lib/storage";
+import { generateId } from "@/lib/utils";
+import { addMemberToFirestore, getMembersFromFirestore } from "@/lib/firestore";
 interface State {
   members: Member[];
   payments: MonthlyPayment[];
@@ -20,14 +25,17 @@ interface State {
 }
 
 type Action =
-  | { type: 'LOAD_DATA'; payload: State }
-  | { type: 'ADD_MEMBER'; payload: Member }
-  | { type: 'UPDATE_MEMBER'; payload: Member }
-  | { type: 'DELETE_MEMBER'; payload: string }
-  | { type: 'RECORD_PAYMENT'; payload: { payment: MonthlyPayment; updatedMember: Member } }
-  | { type: 'ADD_DISTRIBUTION'; payload: Distribution }
-  | { type: 'MARK_ALL_PAID'; payload: MonthlyPayment[];  }
-  | { type: 'UPDATE_SETTINGS'; payload: Settings };
+  | { type: "LOAD_DATA"; payload: State }
+  | { type: "ADD_MEMBER"; payload: Member }
+  | { type: "UPDATE_MEMBER"; payload: Member }
+  | { type: "DELETE_MEMBER"; payload: string }
+  | {
+      type: "RECORD_PAYMENT";
+      payload: { payment: MonthlyPayment; updatedMember: Member };
+    }
+  | { type: "ADD_DISTRIBUTION"; payload: Distribution }
+  | { type: "MARK_ALL_PAID"; payload: MonthlyPayment[] }
+  | { type: "UPDATE_SETTINGS"; payload: Settings };
 
 const defaultSettings: Settings = {
   firstMonthAmount: 2000,
@@ -41,62 +49,67 @@ const defaultSettings: Settings = {
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
-    case 'LOAD_DATA':
+    case "LOAD_DATA":
       return action.payload;
 
-    case 'ADD_MEMBER': {
-      const updated = [...state.members, action.payload];
+    case "ADD_MEMBER": {
+      const updatedMembers = [...state.members, action.payload];
+
+      setMembers(updatedMembers);
+
+      return {
+        ...state,
+        members: updatedMembers,
+      };
+    }
+
+    case "UPDATE_MEMBER": {
+      const updated = state.members.map((m) =>
+        m.id === action.payload.id ? action.payload : m,
+      );
       setMembers(updated);
       return { ...state, members: updated };
     }
 
-    case 'UPDATE_MEMBER': {
-      const updated = state.members.map(m => (m.id === action.payload.id ? action.payload : m));
+    case "DELETE_MEMBER": {
+      const updated = state.members.filter((m) => m.id !== action.payload);
       setMembers(updated);
       return { ...state, members: updated };
     }
 
-    case 'DELETE_MEMBER': {
-      const updated = state.members.filter(m => m.id !== action.payload);
-      setMembers(updated);
-      return { ...state, members: updated };
-    }
-
-    case 'RECORD_PAYMENT': {
+    case "RECORD_PAYMENT": {
       const newPayments = [...state.payments, action.payload.payment];
-      const updatedMembers = state.members.map(m =>
-        m.id === action.payload.updatedMember.id ? action.payload.updatedMember : m
+      const updatedMembers = state.members.map((m) =>
+        m.id === action.payload.updatedMember.id
+          ? action.payload.updatedMember
+          : m,
       );
       setPayments(newPayments);
       setMembers(updatedMembers);
       return { ...state, payments: newPayments, members: updatedMembers };
     }
 
-    case 'ADD_DISTRIBUTION': {
+    case "ADD_DISTRIBUTION": {
       const newDistributions = [...state.distributions, action.payload];
       setDistributions(newDistributions);
       return { ...state, distributions: newDistributions };
     }
 
-    case 'UPDATE_SETTINGS': {
+    case "UPDATE_SETTINGS": {
       setSettings(action.payload);
       return { ...state, settings: action.payload };
     }
 
-    case 'MARK_ALL_PAID': {
+    case "MARK_ALL_PAID": {
+      const updatedPayments = [...state.payments, ...action.payload];
 
-  const updatedPayments = [
-    ...state.payments,
-    ...action.payload
-  ];
+      setPayments(updatedPayments);
 
-  setPayments(updatedPayments);
-
-  return {
-    ...state,
-    payments: updatedPayments
-  };
-}
+      return {
+        ...state,
+        payments: updatedPayments,
+      };
+    }
     default:
       return state;
   }
@@ -105,11 +118,23 @@ function reducer(state: State, action: Action): State {
 interface ContextValue {
   state: State;
   dispatch: React.Dispatch<Action>;
-  addMember: (member: Omit<Member, 'id' | 'joinDate' | 'balance'>) => Promise<void>;
+  addMember: (
+    member: Omit<Member, "id" | "joinDate" | "balance">,
+  ) => Promise<void>;
   updateMember: (member: Member) => void;
   deleteMember: (id: string) => void;
-  recordPayment: (memberId: string, month: number, year: number, principalPaid: number) => MonthlyPayment | null;
-  addDistribution: (memberId: string, month: number, year: number, amount: number) => void;
+  recordPayment: (
+    memberId: string,
+    month: number,
+    year: number,
+    principalPaid: number,
+  ) => MonthlyPayment | null;
+  addDistribution: (
+    memberId: string,
+    month: number,
+    year: number,
+    amount: number,
+  ) => void;
   updateSettings: (settings: Settings) => void;
   getMemberPayments: (memberId: string) => MonthlyPayment[];
   getMonthPayments: (month: number, year: number) => MonthlyPayment[];
@@ -130,105 +155,146 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
+    const loadData = async () => {
+      const members = await getMembersFromFirestore();
 
-  const loadData = async () => {
+      const payments = getPayments();
 
-    const members =
-      await getMembersFromFirestore();
+      const distributions = getDistributions();
 
-    const payments =
-      getPayments();
+      const settings = getSettings() || defaultSettings;
 
-    const distributions =
-      getDistributions();
+      dispatch({
+        type: "LOAD_DATA",
 
-    const settings =
-      getSettings() ||
-      defaultSettings;
-
-    dispatch({
-      type: 'LOAD_DATA',
-
-      payload: {
-        members,
-        payments,
-        distributions,
-        settings,
-      },
-    });
-  };
-
-  loadData();
-
-}, []);
-
-  const addMember = async (memberData: Omit<Member, 'id' | 'joinDate' | 'balance'>) => {
-    const newMember: Member = {
-      ...memberData,
-      balance: 0,
-      id: generateId(),
-      joinDate: new Date().toISOString().split('T')[0],
+        payload: {
+          members,
+          payments,
+          distributions,
+          settings,
+        },
+      });
     };
 
-    await addMemberToFirestore(newMember);
+    loadData();
+  }, []);
 
-    dispatch({ type: 'ADD_MEMBER', payload: newMember });
-  };
+ const addMember = async (
+  memberData:
+  Omit<Member,
+  'id' |
+  'joinDate' |
+  'balance'>
+) => {
 
-  const updateMember = (member: Member) => {
-    dispatch({ type: 'UPDATE_MEMBER', payload: member });
+  try {
+
+    console.log(
+      'STEP 1'
+    );
+
+    const newMember: Member = {
+
+      id: crypto.randomUUID(),
+
+      ...memberData,
+
+      joinDate:
+        new Date()
+          .toLocaleDateString(),
+
+      balance: 0,
+    };
+
+    console.log(
+      'STEP 2',
+      newMember
+    );
+
+    await addMemberToFirestore(
+      newMember
+    );
+
+    console.log(
+      'STEP 3'
+    );
+
+    dispatch({
+      type: 'ADD_MEMBER',
+      payload: newMember,
+    });
+
+    console.log(
+      'STEP 4'
+    );
+
+  } catch (error) {
+
+    console.error(
+      'ADD MEMBER ERROR',
+      error
+    );
+  }
+};
+
+const updateMember = (member: Member) => {
+    dispatch({ type: "UPDATE_MEMBER", payload: member });
   };
 
   const deleteMember = (id: string) => {
-    dispatch({ type: 'DELETE_MEMBER', payload: id });
+    dispatch({ type: "DELETE_MEMBER", payload: id });
   };
 
   const recordPayment = (
     memberId: string,
     month: number,
     year: number,
-    principalPaid: number
+    principalPaid: number,
   ): MonthlyPayment | null => {
-    const member = state.members.find(m => m.id === memberId);
+    const member = state.members.find((m) => m.id === memberId);
     if (!member) return null;
 
     const isFirstMonth =
-  month === state.settings.startMonth &&
-  year === state.settings.startYear;
+      month === state.settings.startMonth && year === state.settings.startYear;
 
-const amount = isFirstMonth
-  ? state.settings.firstMonthAmount
-  : state.settings.monthlyAmount;
+    const amount = isFirstMonth
+      ? state.settings.firstMonthAmount
+      : state.settings.monthlyAmount;
 
-const interest = (member.balance * state.settings.interestRate) / 100;
+    const interest = (member.balance * state.settings.interestRate) / 100;
 
-const totalPaid = amount + principalPaid + interest;
+    const totalPaid = amount + principalPaid + interest;
 
-const newBalance = member.balance - principalPaid;
+    const newBalance = member.balance - principalPaid;
 
-const payment: MonthlyPayment = {
-  id: generateId(),
-  memberId,
-  month,
-  year,
-  contribution: amount,
-  principalPaid,
-  interest,
-  totalPaid,
-  newBalance,
-  paidAt: new Date().toISOString(),
-};
+    const payment: MonthlyPayment = {
+      id: generateId(),
+      memberId,
+      month,
+      year,
+      contribution: amount,
+      principalPaid,
+      interest,
+      totalPaid,
+      newBalance,
+      paidAt: new Date().toISOString(),
+    };
 
     const updatedMember: Member = {
       ...member,
       balance: Math.max(0, newBalance),
     };
 
-    dispatch({ type: 'RECORD_PAYMENT', payload: { payment, updatedMember } });
+    dispatch({ type: "RECORD_PAYMENT", payload: { payment, updatedMember } });
     return payment;
   };
 
-  const addDistribution = (memberId: string, month: number, year: number, amount: number) => {
+  const addDistribution = (
+    memberId: string,
+    month: number,
+    year: number,
+    amount: number,
+  ) => {
     const distribution: Distribution = {
       id: generateId(),
       memberId,
@@ -238,16 +304,16 @@ const payment: MonthlyPayment = {
       givenAt: new Date().toISOString(),
     };
 
-    dispatch({ type: 'ADD_DISTRIBUTION', payload: distribution });
+    dispatch({ type: "ADD_DISTRIBUTION", payload: distribution });
   };
 
   const updateSettings = (settings: Settings) => {
-    dispatch({ type: 'UPDATE_SETTINGS', payload: settings });
+    dispatch({ type: "UPDATE_SETTINGS", payload: settings });
   };
 
   const getMemberPayments = (memberId: string) => {
     return state.payments
-      .filter(p => p.memberId === memberId)
+      .filter((p) => p.memberId === memberId)
       .sort((a, b) => {
         if (a.year !== b.year) return a.year - b.year;
         return a.month - b.month;
@@ -255,29 +321,33 @@ const payment: MonthlyPayment = {
   };
 
   const getMonthPayments = (month: number, year: number) => {
-    return state.payments.filter(p => p.month === month && p.year === year);
+    return state.payments.filter((p) => p.month === month && p.year === year);
   };
 
   const getMemberBalance = (memberId: string) => {
-    const member = state.members.find(m => m.id === memberId);
+    const member = state.members.find((m) => m.id === memberId);
     return member?.balance ?? 0;
   };
 
   const getTotalCollectedForMonth = (month: number, year: number) => {
     return state.payments
-      .filter(p => p.month === month && p.year === year)
+      .filter((p) => p.month === month && p.year === year)
       .reduce((sum, p) => sum + p.totalPaid, 0);
   };
 
   const hasMemberPaid = (memberId: string, month: number, year: number) => {
-    return state.payments.some(p => p.memberId === memberId && p.month === month && p.year === year);
+    return state.payments.some(
+      (p) => p.memberId === memberId && p.month === month && p.year === year,
+    );
   };
 
   const getContributionAmount = (month: number, year: number) => {
     const isFirstMonth =
       month === state.settings.startMonth && year === state.settings.startYear;
 
-    return isFirstMonth ? state.settings.firstMonthAmount : state.settings.monthlyAmount;
+    return isFirstMonth
+      ? state.settings.firstMonthAmount
+      : state.settings.monthlyAmount;
   };
 
   return (
@@ -304,9 +374,9 @@ const payment: MonthlyPayment = {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useChitFund(): ContextValue {
   const ctx = useContext(ChitFundContext);
-  if (!ctx) throw new Error('useChitFund must be used within ChitFundProvider');
+  if (!ctx) throw new Error("useChitFund must be used within ChitFundProvider");
   return ctx;
 }
-
