@@ -10,7 +10,8 @@ interface MemberFormData {
 }
 
 export function MemberListPage() {
-  const { state, addMember, updateMember, deleteMember } = useChitFund();
+  const { state, dispatch, addMember, updateMember, deleteMember } =
+    useChitFund();
   const [searchQuery, setSearchQuery] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingMember, setEditingMember] = useState<string | null>(null);
@@ -75,16 +76,41 @@ export function MemberListPage() {
         Phone: string;
       }>(sheet);
 
+      const importedMembers: {
+        id: string;
+        name: string;
+        phone: string;
+        joinDate: string;
+        balance: number;
+      }[] = [];
+
       for (const item of jsonData) {
-        console.log(item);
+        const name = item.Name?.toString().trim();
 
-        if (!item.Name || !item.Phone) continue;
+        const phone = item.Phone?.toString().trim();
 
-        await addMember({
-          name: String(item.Name),
-          phone: String(item.Phone),
+        if (!name) continue;
+
+        importedMembers.push({
+          id: String(state.members.length + importedMembers.length + 1),
+
+          name,
+
+          phone: phone || "",
+
+          joinDate: new Date().toLocaleDateString(),
+
+          balance: 0,
         });
       }
+
+      dispatch({
+        type: "SET_STATE",
+
+        payload: {
+          members: [...state.members, ...importedMembers],
+        },
+      });
 
       alert("Members imported successfully");
     } catch (error) {

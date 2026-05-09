@@ -3,9 +3,20 @@ import { useChitFund } from '../context/ChitFundContext';
 import { formatINR } from '@/lib/utils';
 import { MONTHS } from '@/types';
 import { HandCoins, Plus } from 'lucide-react';
+import {
+  addDoc,
+  collection
+} from 'firebase/firestore';
+
+import {
+  db,
+  auth
+} from '@/lib/firebase';
+
+
 
 export function DistributionPage() {
-  const { state, addDistribution, getTotalCollectedForMonth } = useChitFund();
+  const { state, getTotalCollectedForMonth } = useChitFund();
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
 
@@ -18,12 +29,87 @@ export function DistributionPage() {
   const [selectedMember, setSelectedMember] = useState('');
   const [amount, setAmount] = useState(String(totalCollected));
 
-  
-  const handleGiveLoan = (e: React.FormEvent) => {
+  const saveDistribution =
+  async () => {
+
+  if (
+    !selectedMember ||
+    !amount
+  ) return;
+
+  const member =
+    state.members.find(
+      (m) =>
+        m.id ===
+        selectedMember
+    );
+
+  if (!member) return;
+
+  await addDoc(
+    collection(
+      db,
+      'distributions'
+    ),
+
+    {
+      userId:
+        auth.currentUser?.uid,
+
+      memberId:
+        member.id,
+
+      memberName:
+        member.name,
+
+      amount:
+        Number(amount),
+
+      month:
+        currentMonth,
+
+      year:
+        currentYear,
+
+      monthKey:
+        `${currentYear}-${currentMonth}`,
+
+      distributedAt:
+        new Date()
+          .toISOString(),
+
+      status:
+        'given',
+
+      note: '',
+    }
+  );
+
+  alert(
+    'Distribution saved'
+  );
+
+  setShowForm(false);
+
+  setSelectedMember('');
+
+  setAmount(
+    String(
+      totalCollected
+    )
+  );
+}
+  const handleGiveLoan =
+  async (
+    e: React.FormEvent
+  ) => {
+
     e.preventDefault();
-    if (!selectedMember || !amount) return;
-    addDistribution(selectedMember, currentMonth, currentYear, parseFloat(amount));
+
+    await saveDistribution();
+
     setShowForm(false);
+
     setSelectedMember('');
   };
 

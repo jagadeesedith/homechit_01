@@ -16,7 +16,7 @@ import {
   setSettings,
 } from "@/lib/storage";
 import { generateId } from "@/lib/utils";
-import { addMemberToFirestore, getMembersFromFirestore } from "@/lib/firestore";
+import { getMembersFromFirestore } from "@/lib/firestore";
 interface State {
   members: Member[];
   payments: MonthlyPayment[];
@@ -26,6 +26,7 @@ interface State {
 
 type Action =
   | { type: "LOAD_DATA"; payload: State }
+  | { type: "SET_STATE"; payload: Partial<State> }
   | { type: "ADD_MEMBER"; payload: Member }
   | { type: "UPDATE_MEMBER"; payload: Member }
   | { type: "DELETE_MEMBER"; payload: string }
@@ -36,6 +37,7 @@ type Action =
   | { type: "ADD_DISTRIBUTION"; payload: Distribution }
   | { type: "MARK_ALL_PAID"; payload: MonthlyPayment[] }
   | { type: "UPDATE_SETTINGS"; payload: Settings };
+
 
 const defaultSettings: Settings = {
   firstMonthAmount: 2000,
@@ -52,16 +54,25 @@ function reducer(state: State, action: Action): State {
     case "LOAD_DATA":
       return action.payload;
 
-    case "ADD_MEMBER": {
-      const updatedMembers = [...state.members, action.payload];
-
-      setMembers(updatedMembers);
-
+    case 'SET_STATE':
       return {
         ...state,
-        members: updatedMembers,
+        ...action.payload,
       };
-    }
+
+    case 'ADD_MEMBER':
+
+  return {
+
+    ...state,
+
+    members: [
+      ...state.members,
+      action.payload,
+    ],
+  };
+    
+
 
     case "UPDATE_MEMBER": {
       const updated = state.members.map((m) =>
@@ -179,62 +190,38 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
     loadData();
   }, []);
 
- const addMember = async (
-  memberData:
-  Omit<Member,
-  'id' |
-  'joinDate' |
-  'balance'>
+const addMember = async (
+  memberData: {
+    name: string;
+    phone: string;
+  }
 ) => {
 
-  try {
 
-    console.log(
-      'STEP 1'
-    );
+  const newMember = {
 
-    const newMember: Member = {
+    id:
+      crypto.randomUUID(),
 
-      id: crypto.randomUUID(),
+    name:
+      memberData.name,
 
-      ...memberData,
+    phone:
+      memberData.phone,
 
-      joinDate:
-        new Date()
-          .toLocaleDateString(),
+    joinDate:
+      new Date()
+        .toLocaleDateString(),
 
-      balance: 0,
-    };
+    balance: 0,
+  };
 
-    console.log(
-      'STEP 2',
-      newMember
-    );
-
-    await addMemberToFirestore(
-      newMember
-    );
-
-    console.log(
-      'STEP 3'
-    );
-
-    dispatch({
-      type: 'ADD_MEMBER',
-      payload: newMember,
-    });
-
-    console.log(
-      'STEP 4'
-    );
-
-  } catch (error) {
-
-    console.error(
-      'ADD MEMBER ERROR',
-      error
-    );
-  }
+  dispatch({
+    type: 'SET_STATE',
+    payload: {
+      members: [...state.members, newMember],
+    },
+  });
 };
 
 const updateMember = (member: Member) => {
