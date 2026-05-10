@@ -24,11 +24,14 @@ interface State {
   payments: MonthlyPayment[];
   distributions: Distribution[];
   settings: Settings;
+  selectedMonth: number;
+  selectedYear: number;
 }
 
 type Action =
   | { type: "LOAD_DATA"; payload: State }
   | { type: "SET_STATE"; payload: Partial<State> }
+  | { type: "SET_SELECTED_MONTH_YEAR"; payload: { month: number; year: number } }
   | { type: "UPDATE_MEMBER"; payload: Member }
   | { type: "DELETE_MEMBER"; payload: string }
   | {
@@ -73,6 +76,13 @@ function reducer(state: State, action: Action): State {
       return {
         ...state,
         ...action.payload,
+      };
+
+    case "SET_SELECTED_MONTH_YEAR":
+      return {
+        ...state,
+        selectedMonth: action.payload.month,
+        selectedYear: action.payload.year,
       };
 
     case "UPDATE_MEMBER": {
@@ -120,6 +130,7 @@ interface ContextValue {
   state: State;
   dispatch: React.Dispatch<Action>;
   reloadFromFirestore: () => Promise<void>;
+  setSelectedMonthYear: (month: number, year: number) => void;
   addMember: (
     member: Omit<Member, "id" | "joinDate" | "balance">,
   ) => Promise<void>;
@@ -156,6 +167,8 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
     payments: [],
     distributions: [],
     settings: defaultSettings,
+    selectedMonth: defaultSettings.startMonth,
+    selectedYear: defaultSettings.startYear,
   });
 
   const reloadFromFirestore = async () => {
@@ -202,6 +215,8 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
         payments,
         distributions,
         settings,
+        selectedMonth: settings.startMonth,
+        selectedYear: settings.startYear,
       },
     });
   };
@@ -216,6 +231,8 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
             payments: [],
             distributions: [],
             settings: defaultSettings,
+            selectedMonth: defaultSettings.startMonth,
+            selectedYear: defaultSettings.startYear,
           },
         });
         return;
@@ -229,8 +246,11 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
     });
 
     return () => unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+     }, []);
+
+  const setSelectedMonthYear = (month: number, year: number) => {
+    dispatch({ type: "SET_SELECTED_MONTH_YEAR", payload: { month, year } });
+  };
 
   const addMember = async (memberData: {
     name: string;
@@ -507,6 +527,7 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
         state,
         dispatch,
         reloadFromFirestore,
+        setSelectedMonthYear,
         addMember,
         updateMember,
         deleteMember,

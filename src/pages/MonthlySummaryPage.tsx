@@ -1,13 +1,17 @@
-import { useState } from 'react';
 import { useChitFund } from '../context/ChitFundContext';
 import { formatINR } from '@/lib/utils';
 import { MONTHS } from '@/types';
 
 export function MonthlySummaryPage() {
-  const { state } = useChitFund();
+  const { state, setSelectedMonthYear } = useChitFund();
   const currentYear = new Date().getFullYear();
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
-  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const selectedMonth = state.selectedMonth;
+  const selectedYear = state.selectedYear;
+
+  const minYear = Math.min(2024, state.settings.startYear, currentYear - 2);
+  const maxYear = Math.max(currentYear + 5, state.settings.startYear + 5);
+  const years: number[] = [];
+  for (let y = minYear; y <= maxYear; y += 1) years.push(y);
 
   const payments = state.payments.filter(p => p.month === selectedMonth && p.year === selectedYear);
   const paidMemberIds = new Set(payments.map(p => p.memberId));
@@ -31,7 +35,7 @@ export function MonthlySummaryPage() {
             return (
               <button
                 key={m}
-                onClick={() => setSelectedMonth(monthNum)}
+                onClick={() => setSelectedMonthYear(monthNum, selectedYear)}
                 className={`
                   px-4 py-1.5 rounded-full text-sm font-medium transition-colors duration-200
                   ${isActive
@@ -47,10 +51,10 @@ export function MonthlySummaryPage() {
         </div>
         <select
           value={selectedYear}
-          onChange={(e) => setSelectedYear(Number(e.target.value))}
+          onChange={(e) => setSelectedMonthYear(selectedMonth, Number(e.target.value))}
           className="text-sm rounded-lg border border-[#e9ecef] px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#004b87]"
         >
-          {[currentYear - 1, currentYear, currentYear + 1].map(y => (
+          {years.map(y => (
             <option key={y} value={y}>{y}</option>
           ))}
         </select>

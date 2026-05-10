@@ -1,5 +1,3 @@
-import { useEffect, useState } from "react";
-
 import { SummaryCards } from "@/components/SummaryCards";
 
 import { MemberGrid } from "@/components/MemberGrid";
@@ -8,23 +6,20 @@ import { MONTHS } from "@/types";
 
 import { useChitFund } from "../context/ChitFundContext";
 
-import { setupFirestore } from "../setupFirestore";
-
 export function DashboardPage() {
-  const { state, markAllPaidForMonth } = useChitFund();
-
-  const [month, setMonth] = useState(state.settings.startMonth);
-
-  const [year, setYear] = useState(state.settings.startYear);
-
-  useEffect(() => {
-    setMonth(state.settings.startMonth);
-    setYear(state.settings.startYear);
-  }, [state.settings.startMonth, state.settings.startYear]);
+  const { state, markAllPaidForMonth, setSelectedMonthYear } = useChitFund();
+  const month = state.selectedMonth;
+  const year = state.selectedYear;
 
   const handleMarkAllPaid = async () => {
     await markAllPaidForMonth(month, year);
   };
+
+  const currentYear = new Date().getFullYear();
+  const minYear = Math.min(2024, state.settings.startYear, currentYear - 2);
+  const maxYear = Math.max(currentYear + 5, state.settings.startYear + 5);
+  const years: number[] = [];
+  for (let y = minYear; y <= maxYear; y += 1) years.push(y);
 
   return (
     <div className="pt-16 lg:pt-0">
@@ -37,20 +32,13 @@ export function DashboardPage() {
           <p className="text-sm text-[#6c757d] mt-1">
             Click on a member box to record their payment
           </p>
-
-          <button
-            onClick={setupFirestore}
-            className="bg-green-600 text-white px-4 py-2 rounded-lg"
-          >
-            Setup Firestore
-          </button>
         </div>
 
         <div className="flex flex-wrap gap-3">
           {/* Month Selector */}
           <select
             value={month}
-            onChange={(e) => setMonth(Number(e.target.value))}
+            onChange={(e) => setSelectedMonthYear(Number(e.target.value), year)}
             className="border rounded-lg px-3 py-2"
           >
             {MONTHS.map((m, index) => (
@@ -63,10 +51,10 @@ export function DashboardPage() {
           {/* Year Selector */}
           <select
             value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
+            onChange={(e) => setSelectedMonthYear(month, Number(e.target.value))}
             className="border rounded-lg px-3 py-2"
           >
-            {[2024, 2025, 2026, 2027].map((y) => (
+            {years.map((y) => (
               <option key={y} value={y}>
                 {y}
               </option>
