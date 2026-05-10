@@ -1,7 +1,5 @@
-# TODO
-
-- [ ] Step 1: Fix `MemberListPage.tsx` Excel import loop to match required logic (trim, skip empty, required console logs, call `addMember` with correct fields).
-- [ ] Step 2: Fix `ChitFundContext.tsx` so `addMember()` dispatch updates state (add reducer `case 'SET_STATE'` or change dispatch to an existing reducer action).
-- [ ] Step 3: Verify TypeScript correctness and that manual add member still works.
-- [ ] Step 4: Confirm Excel import instantly updates members table in UI.
+- [ ] Implement month/year selectors on src/pages/DistributionPage.tsx
+- [ ] Replace hardcoded currentMonth/currentYear with selectedMonth/selectedYear in totals, filtering, and saveDistribution payload (including monthKey)
+- [ ] Update “Total Collected - {month} {year}” text to use selected values
+- [ ] Manually test by switching months/years and verifying table + totals update
 

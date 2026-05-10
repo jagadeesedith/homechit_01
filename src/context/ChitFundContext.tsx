@@ -8,17 +8,13 @@ import {
 import type { Member, MonthlyPayment, Distribution, Settings } from "@/types";
 import {
   setMembers,
-  getPayments,
   setPayments,
-  getDistributions,
   setDistributions,
-  getSettings,
   setSettings,
 } from "@/lib/storage";
 import { generateId } from "@/lib/utils";
-import { getMembersFromFirestore } from "@/lib/firestore";
-import { db } from "@/lib/firebase";
-import {  doc , setDoc} from "firebase/firestore";
+import { db, auth } from "@/lib/firebase";
+import { getDocs, collection, doc, setDoc } from "firebase/firestore";
 
 interface State {
   members: Member[];
@@ -65,7 +61,6 @@ function reducer(state: State, action: Action): State {
     case "ADD_MEMBER":
       return {
         ...state,
-
         members: [...state.members, action.payload],
       };
 
@@ -108,14 +103,10 @@ function reducer(state: State, action: Action): State {
 
     case "MARK_ALL_PAID": {
       const updatedPayments = [...state.payments, ...action.payload];
-
       setPayments(updatedPayments);
-
-      return {
-        ...state,
-        payments: updatedPayments,
-      };
+      return { ...state, payments: updatedPayments };
     }
+
     default:
       return state;
   }
@@ -152,7 +143,11 @@ interface ContextValue {
 
 const ChitFundContext = createContext<ContextValue | null>(null);
 
-export function ChitFundProvider({ children }: { children: ReactNode }) {
+export function ChitFundProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const [state, dispatch] = useReducer(reducer, {
     members: [],
     payments: [],
@@ -162,83 +157,84 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const loadData = async () => {
-      const members = await getMembersFromFirestore();
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
 
-      const payments = getPayments();
+        const userId = user.uid;
 
-      const distributions = getDistributions();
+        // Members
+        const membersSnapshot = await getDocs(
+          collection(db, "users", userId, "members"),
+        );
+        const members: Member[] = membersSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...(doc.data() as Omit<Member, "id">),
+        }));
 
-      const settings = getSettings() || defaultSettings;
+        // Payments
+        const paymentsSnapshot = await getDocs(
+          collection(db, "users", userId, "payments"),
+        );
+        const payments: MonthlyPayment[] = paymentsSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...(doc.data() as Omit<MonthlyPayment, "id">),
+        }));
 
-      dispatch({
-        type: "LOAD_DATA",
-
-        payload: {
-          members,
-          payments,
-          distributions,
-          settings,
-        },
-      });
+        dispatch({
+          type: "LOAD_DATA",
+          payload: {
+            members,
+            payments,
+            distributions: state.distributions,
+            settings: state.settings,
+          },
+        });
+      } catch (error) {
+        console.error("Load data error:", error);
+      }
     };
 
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const addMember = async (memberData: { name: string; phone: string }) => {
     try {
+      const user = auth.currentUser;
+      if (!user) return;
+
       const newMember = {
         name: memberData.name,
-
         phone: memberData.phone,
-
         joinDate: new Date().toLocaleDateString(),
-
         balance: 0,
-
         principalPaid: 0,
-
         totalPaid: 0,
-
         active: true,
-
         notes: "",
       };
-const memberId =
-  String(
-    state.members.length + 1
-  );
 
-await setDoc(
+      const memberId = String(state.members.length + 1);
 
-  doc(
-    db,
-    "users",
-    "userId",
-    "members",
-    memberId
-  ),
-
-  newMember
-);
+      await setDoc(
+        doc(db, "users", user.uid, "members", memberId),
+        newMember,
+        { merge: true },
+      );
 
       dispatch({
         type: "SET_STATE",
-
         payload: {
           members: [
             ...state.members,
-
             {
               id: memberId,
-
               ...newMember,
             },
           ],
         },
       });
-
-      console.log("Member saved");
     } catch (error) {
       console.error("Firestore error:", error);
     }
@@ -279,6 +275,7 @@ await setDoc(
       memberId,
       month,
       year,
+      previousBalance: member.balance,
       contribution: amount,
       principalPaid,
       interest,
@@ -311,7 +308,23 @@ await setDoc(
       givenAt: new Date().toISOString(),
     };
 
-    dispatch({ type: "ADD_DISTRIBUTION", payload: distribution });
+    const member = state.members.find((m) => m.id === memberId);
+    if (!member) return;
+
+    const updatedMember: Member = {
+      ...member,
+      balance: member.balance + amount,
+    };
+
+    dispatch({
+      type: "UPDATE_MEMBER",
+      payload: updatedMember,
+    });
+
+    dispatch({
+      type: "ADD_DISTRIBUTION",
+      payload: distribution,
+    });
   };
 
   const updateSettings = (settings: Settings) => {
@@ -352,9 +365,7 @@ await setDoc(
     const isFirstMonth =
       month === state.settings.startMonth && year === state.settings.startYear;
 
-    return isFirstMonth
-      ? state.settings.firstMonthAmount
-      : state.settings.monthlyAmount;
+    return isFirstMonth ? state.settings.firstMonthAmount : state.settings.monthlyAmount;
   };
 
   return (
@@ -387,3 +398,4 @@ export function useChitFund(): ContextValue {
   if (!ctx) throw new Error("useChitFund must be used within ChitFundProvider");
   return ctx;
 }
+

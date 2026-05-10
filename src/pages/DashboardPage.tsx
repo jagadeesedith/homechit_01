@@ -38,6 +38,8 @@ export function DashboardPage() {
 
         year,
 
+        previousBalance: member.balance,
+
         contribution,
 
         principalPaid,

@@ -17,12 +17,23 @@ import {
 
 export function DistributionPage() {
   const { state, getTotalCollectedForMonth } = useChitFund();
-  const currentMonth = new Date().getMonth() + 1;
-  const currentYear = new Date().getFullYear();
 
-  const totalCollected = getTotalCollectedForMonth(currentMonth, currentYear);
+  const [selectedMonth, setSelectedMonth] = useState(
+    new Date().getMonth() + 1
+  );
+
+  const [selectedYear, setSelectedYear] = useState(
+    new Date().getFullYear()
+  );
+
+  const totalCollected = getTotalCollectedForMonth(
+    selectedMonth,
+    selectedYear
+  );
+
   const monthDistributions = state.distributions.filter(
-    d => d.month === currentMonth && d.year === currentYear
+    (d) =>
+      d.month === selectedMonth && d.year === selectedYear
   );
 
   const [showForm, setShowForm] = useState(false);
@@ -66,13 +77,13 @@ export function DistributionPage() {
         Number(amount),
 
       month:
-        currentMonth,
+        selectedMonth,
 
       year:
-        currentYear,
+        selectedYear,
 
       monthKey:
-        `${currentYear}-${currentMonth}`,
+        `${selectedYear}-${selectedMonth}`,
 
       distributedAt:
         new Date()
@@ -115,13 +126,49 @@ export function DistributionPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-[#1d1d1d] mb-6">Distribution</h1>
+      <h1 className="text-2xl font-semibold text-[#1d1d1d] mb-2">Distribution</h1>
+
+      <div className="flex gap-3 mb-6">
+
+        <select
+          value={selectedMonth}
+          onChange={(e) =>
+            setSelectedMonth(
+              Number(e.target.value)
+            )
+          }
+          className="border border-[#e9ecef] rounded-lg p-2"
+        >
+          {MONTHS.map(
+            (month, index) => (
+              <option
+                key={index}
+                value={index + 1}
+              >
+                {month}
+              </option>
+            )
+          )}
+        </select>
+
+        <input
+          type="number"
+          value={selectedYear}
+          onChange={(e) =>
+            setSelectedYear(
+              Number(e.target.value)
+            )
+          }
+          className="border border-[#e9ecef] rounded-lg p-2 w-28"
+        />
+
+      </div>
 
       <div className="bg-white p-6 rounded-lg border border-[#e9ecef] mb-6">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs text-[#6c757d] font-medium uppercase tracking-wider">
-              Total Collected - {MONTHS[currentMonth - 1]} {currentYear}
+              Total Collected - {MONTHS[selectedMonth - 1]} {selectedYear}
             </p>
             <p className="text-3xl font-bold text-[#004b87] mt-2">{formatINR(totalCollected)}</p>
           </div>
