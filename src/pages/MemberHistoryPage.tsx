@@ -8,7 +8,7 @@ import { Search } from 'lucide-react';
 import { auth, db } from '@/lib/firebase';
 
 export function MemberHistoryPage() {
-  const { state, getMemberPayments } = useChitFund();
+  const { state, getMemberPayments, reloadFromFirestore } = useChitFund();
   const [selectedMemberId, setSelectedMemberId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -84,7 +84,7 @@ export function MemberHistoryPage() {
 
       alert('Import Success ✅');
       e.target.value = '';
-      window.location.reload();
+      await reloadFromFirestore();
     } catch (error) {
       console.error(error);
       const message = error instanceof Error ? error.message : String(error);

@@ -1,21 +1,30 @@
 import {
   createContext,
   useContext,
-  useReducer,
   useEffect,
+  useReducer,
   type ReactNode,
-}
-  from "react";
-import type { Member, MonthlyPayment, Distribution, Settings } from "@/types";
+} from "react";
+import { onAuthStateChanged } from "firebase/auth";
 import {
-  setMembers,
-  setPayments,
-  setDistributions,
-  setSettings,
-} from "@/lib/storage";
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  writeBatch,
+} from "firebase/firestore";
+
+import type { Distribution, Member, MonthlyPayment, Settings } from "@/types";
 import { generateId } from "@/lib/utils";
 import { db, auth } from "@/lib/firebase";
-import { collection, getDocs, doc, setDoc } from "@firebase/firestore";
+
+import {
+  setDistributions,
+  setMembers,
+  setPayments,
+  setSettings,
+} from "@/lib/storage";
 
 interface State {
   members: Member[];
@@ -27,13 +36,12 @@ interface State {
 type Action =
   | { type: "LOAD_DATA"; payload: State }
   | { type: "SET_STATE"; payload: Partial<State> }
-  | { type: "ADD_MEMBER"; payload: Member }
   | { type: "UPDATE_MEMBER"; payload: Member }
   | { type: "DELETE_MEMBER"; payload: string }
   | {
-    type: "RECORD_PAYMENT";
-    payload: { payment: MonthlyPayment; updatedMember: Member };
-  }
+      type: "RECORD_PAYMENT";
+      payload: { payment: MonthlyPayment; updatedMember: Member };
+    }
   | { type: "ADD_DISTRIBUTION"; payload: Distribution }
   | { type: "MARK_ALL_PAID"; payload: MonthlyPayment[] }
   | { type: "UPDATE_SETTINGS"; payload: Settings };
@@ -59,12 +67,6 @@ function reducer(state: State, action: Action): State {
         ...action.payload,
       };
 
-    case "ADD_MEMBER":
-      return {
-        ...state,
-        members: [...state.members, action.payload],
-      };
-
     case "UPDATE_MEMBER": {
       const updated = state.members.map((m) =>
         m.id === action.payload.id ? action.payload : m,
@@ -81,13 +83,15 @@ function reducer(state: State, action: Action): State {
 
     case "RECORD_PAYMENT": {
       const newPayments = [...state.payments, action.payload.payment];
+      setPayments(newPayments);
+
       const updatedMembers = state.members.map((m) =>
         m.id === action.payload.updatedMember.id
           ? action.payload.updatedMember
           : m,
       );
-      setPayments(newPayments);
       setMembers(updatedMembers);
+
       return { ...state, payments: newPayments, members: updatedMembers };
     }
 
@@ -116,24 +120,27 @@ function reducer(state: State, action: Action): State {
 interface ContextValue {
   state: State;
   dispatch: React.Dispatch<Action>;
+  reloadFromFirestore: () => Promise<void>;
   addMember: (
     member: Omit<Member, "id" | "joinDate" | "balance">,
   ) => Promise<void>;
-  updateMember: (member: Member) => void;
-  deleteMember: (id: string) => void;
+  updateMember: (member: Member) => Promise<void>;
+  deleteMember: (id: string) => Promise<void>;
   recordPayment: (
     memberId: string,
     month: number,
     year: number,
     principalPaid: number,
-  ) => MonthlyPayment | null;
+  ) => Promise<MonthlyPayment | null>;
+  markAllPaidForMonth: (month: number, year: number) => Promise<void>;
   addDistribution: (
     memberId: string,
     month: number,
     year: number,
     amount: number,
-  ) => void;
-  updateSettings: (settings: Settings) => void;
+  ) => Promise<void>;
+  updateSettings: (settings: Settings) => Promise<void>;
+
   getMemberPayments: (memberId: string) => MonthlyPayment[];
   getMonthPayments: (month: number, year: number) => MonthlyPayment[];
   getMemberBalance: (memberId: string) => number;
@@ -144,11 +151,7 @@ interface ContextValue {
 
 const ChitFundContext = createContext<ContextValue | null>(null);
 
-export function ChitFundProvider({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export function ChitFundProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, {
     members: [],
     payments: [],
@@ -156,122 +159,164 @@ export function ChitFundProvider({
     settings: defaultSettings,
   });
 
+  const reloadFromFirestore = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const userId = user.uid;
+
+    const [
+      membersSnapshot,
+      paymentsSnapshot,
+      distributionsSnapshot,
+      settingsSnap,
+    ] = await Promise.all([
+      getDocs(collection(db, "users", userId, "members")),
+      getDocs(collection(db, "users", userId, "payments")),
+      getDocs(collection(db, "users", userId, "distributions")),
+      getDoc(doc(db, "users", userId, "settings", "chit")),
+    ]);
+
+    const members: Member[] = membersSnapshot.docs.map((d) => ({
+      id: d.id,
+      ...(d.data() as Omit<Member, "id">),
+    }));
+
+    const payments: MonthlyPayment[] = paymentsSnapshot.docs.map((d) => ({
+      id: d.id,
+      ...(d.data() as Omit<MonthlyPayment, "id">),
+    }));
+
+    const distributions: Distribution[] = distributionsSnapshot.docs.map((d) => ({
+      id: d.id,
+      ...(d.data() as Omit<Distribution, "id">),
+    }));
+
+    const settings: Settings = settingsSnap.exists()
+      ? ({ ...(settingsSnap.data() as Settings) } satisfies Settings)
+      : defaultSettings;
+
+    dispatch({
+      type: "LOAD_DATA",
+      payload: {
+        members,
+        payments,
+        distributions,
+        settings,
+      },
+    });
+  };
+
   useEffect(() => {
-    const loadFirestoreData = async (uid: string) => {
-      try {
-        // Members
-        const membersSnapshot = await getDocs(
-          collection(db, "users", uid, "members")
-        );
-
-        const members = membersSnapshot.docs.map((doc: any) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Member[];
-
-        // Payments
-        const paymentsSnapshot = await getDocs(
-          collection(db, "users", uid, "payments")
-        );
-
-        const payments = paymentsSnapshot.docs.map((doc: any) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as MonthlyPayment[];
-
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
         dispatch({
           type: "LOAD_DATA",
           payload: {
-            members,
-            payments,
+            members: [],
+            payments: [],
             distributions: [],
             settings: defaultSettings,
           },
         });
+        return;
+      }
+
+      try {
+        await reloadFromFirestore();
       } catch (error) {
         console.error("Firestore load error:", error);
       }
-    };
-
-    // Ensure we load once auth is ready (avoids stale/empty state)
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (!user?.uid) return;
-      loadFirestoreData(user.uid);
     });
 
     return () => unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const addMember = async (memberData: {
+    name: string;
+    phone: string;
+  }) => {
+    const user = auth.currentUser;
+    if (!user) return;
 
-  const addMember = async (memberData: { name: string; phone: string }) => {
-    try {
-      const user = auth.currentUser;
-      if (!user) return;
+    const newMember = {
+      name: memberData.name,
+      phone: memberData.phone,
+      joinDate: new Date().toISOString(),
+      balance: 0,
+      principalPaid: 0,
+      totalPaid: 0,
+      active: true,
+      notes: "",
+    };
 
-      const newMember = {
-        name: memberData.name,
-        phone: memberData.phone,
-        joinDate: new Date().toLocaleDateString(),
-        balance: 0,
-        principalPaid: 0,
-        totalPaid: 0,
-        active: true,
-        notes: "",
-      };
+    const memberId = String(state.members.length + 1);
 
-      const memberId = String(state.members.length + 1);
+    await setDoc(
+      doc(db, "users", user.uid, "members", memberId),
+      newMember,
+      { merge: true },
+    );
 
-      await setDoc(
-        doc(db, "users", user.uid, "members", memberId),
-        newMember,
-        { merge: true },
-      );
-
-      dispatch({
-        type: "SET_STATE",
-        payload: {
-          members: [
-            ...state.members,
-            {
-              id: memberId,
-              ...newMember,
-            },
-          ],
-        },
-      });
-    } catch (error) {
-      console.error("Firestore error:", error);
-    }
+    dispatch({
+      type: "LOAD_DATA",
+      payload: {
+        ...state,
+        members: [
+          ...state.members,
+          {
+            id: memberId,
+            ...(newMember as Omit<Member, "id">),
+          },
+        ],
+      },
+    });
   };
 
-  const updateMember = (member: Member) => {
+  const updateMember = async (member: Member) => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    await setDoc(doc(db, "users", user.uid, "members", member.id), member, {
+      merge: true,
+    });
+
     dispatch({ type: "UPDATE_MEMBER", payload: member });
   };
 
-  const deleteMember = (id: string) => {
+  const deleteMember = async (id: string) => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    // deleteDoc is intentionally not used here to avoid missing import changes;
+    // UI state will refresh on next reload.
+    const batch = writeBatch(db);
+    batch.delete(doc(db, "users", user.uid, "members", id));
+    await batch.commit();
+
     dispatch({ type: "DELETE_MEMBER", payload: id });
   };
 
-  const recordPayment = (
+  const recordPayment = async (
     memberId: string,
     month: number,
     year: number,
     principalPaid: number,
-  ): MonthlyPayment | null => {
+  ): Promise<MonthlyPayment | null> => {
     const member = state.members.find((m) => m.id === memberId);
     if (!member) return null;
 
     const isFirstMonth =
-      month === state.settings.startMonth && year === state.settings.startYear;
+      month === state.settings.startMonth &&
+      year === state.settings.startYear;
 
     const amount = isFirstMonth
       ? state.settings.firstMonthAmount
       : state.settings.monthlyAmount;
 
     const interest = (member.balance * state.settings.interestRate) / 100;
-
     const totalPaid = amount + principalPaid + interest;
-
     const newBalance = member.balance - principalPaid;
 
     const payment: MonthlyPayment = {
@@ -293,16 +338,81 @@ export function ChitFundProvider({
       balance: Math.max(0, newBalance),
     };
 
-    dispatch({ type: "RECORD_PAYMENT", payload: { payment, updatedMember } });
+    const user = auth.currentUser;
+    if (!user) return null;
+
+    const batch = writeBatch(db);
+    batch.set(doc(db, "users", user.uid, "payments", payment.id), payment, {
+      merge: true,
+    });
+    batch.set(
+      doc(db, "users", user.uid, "members", updatedMember.id),
+      updatedMember,
+      { merge: true },
+    );
+
+    await batch.commit();
+
+    dispatch({
+      type: "RECORD_PAYMENT",
+      payload: { payment, updatedMember },
+    });
+
     return payment;
   };
 
-  const addDistribution = (
+  const markAllPaidForMonth = async (month: number, year: number) => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const payments: MonthlyPayment[] = state.members.map((member) => {
+      const isFirstMonth =
+        month === state.settings.startMonth &&
+        year === state.settings.startYear;
+
+      const contribution = isFirstMonth
+        ? state.settings.firstMonthAmount
+        : state.settings.monthlyAmount;
+
+      const interest = (member.balance * state.settings.interestRate) / 100;
+      const principalPaid = 0;
+      const totalPaid = contribution + principalPaid + interest;
+
+      return {
+        id: generateId(),
+        memberId: member.id,
+        month,
+        year,
+        previousBalance: member.balance,
+        contribution,
+        principalPaid,
+        interest,
+        totalPaid,
+        newBalance: member.balance,
+        paidAt: new Date().toISOString(),
+      };
+    });
+
+    for (let i = 0; i < payments.length; i += 450) {
+      const batch = writeBatch(db);
+      for (const p of payments.slice(i, i + 450)) {
+        batch.set(doc(db, "users", user.uid, "payments", p.id), p, { merge: true });
+      }
+      await batch.commit();
+    }
+
+    dispatch({ type: "MARK_ALL_PAID", payload: payments });
+  };
+
+  const addDistribution = async (
     memberId: string,
     month: number,
     year: number,
     amount: number,
-  ) => {
+  ): Promise<void> => {
+    const user = auth.currentUser;
+    if (!user) return;
+
     const distribution: Distribution = {
       id: generateId(),
       memberId,
@@ -320,18 +430,33 @@ export function ChitFundProvider({
       balance: member.balance + amount,
     };
 
-    dispatch({
-      type: "UPDATE_MEMBER",
-      payload: updatedMember,
-    });
+    const batch = writeBatch(db);
+    batch.set(
+      doc(db, "users", user.uid, "distributions", distribution.id),
+      distribution,
+      { merge: true },
+    );
+    batch.set(
+      doc(db, "users", user.uid, "members", updatedMember.id),
+      updatedMember,
+      { merge: true },
+    );
+    await batch.commit();
 
-    dispatch({
-      type: "ADD_DISTRIBUTION",
-      payload: distribution,
-    });
+    dispatch({ type: "UPDATE_MEMBER", payload: updatedMember });
+    dispatch({ type: "ADD_DISTRIBUTION", payload: distribution });
   };
 
-  const updateSettings = (settings: Settings) => {
+  const updateSettings = async (settings: Settings) => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    await setDoc(
+      doc(db, "users", user.uid, "settings", "chit"),
+      settings,
+      { merge: true },
+    );
+
     dispatch({ type: "UPDATE_SETTINGS", payload: settings });
   };
 
@@ -377,10 +502,12 @@ export function ChitFundProvider({
       value={{
         state,
         dispatch,
+        reloadFromFirestore,
         addMember,
         updateMember,
         deleteMember,
         recordPayment,
+        markAllPaidForMonth,
         addDistribution,
         updateSettings,
         getMemberPayments,

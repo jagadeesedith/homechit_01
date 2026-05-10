@@ -30,10 +30,10 @@ export function PaymentModal({ memberId, month, year, onClose }: PaymentModalPro
   const totalToCollect = contribution + principalNum + interest;
   const newBalance = lastBalance - principalNum;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!principalPaid || isNaN(parseFloat(principalPaid))) return;
-    recordPayment(memberId, month, year, principalNum);
+    await recordPayment(memberId, month, year, principalNum);
     onClose();
   };
 

@@ -3,20 +3,9 @@ import { useChitFund } from '../context/ChitFundContext';
 import { formatINR } from '@/lib/utils';
 import { MONTHS } from '@/types';
 import { HandCoins, Plus } from 'lucide-react';
-import {
-  addDoc,
-  collection
-} from 'firebase/firestore';
-
-import {
-  db,
-  auth
-} from '@/lib/firebase';
-
-
 
 export function DistributionPage() {
-  const { state, getTotalCollectedForMonth } = useChitFund();
+  const { state, getTotalCollectedForMonth, addDistribution } = useChitFund();
 
   const [selectedMonth, setSelectedMonth] = useState(
     new Date().getMonth() + 1
@@ -57,43 +46,11 @@ export function DistributionPage() {
 
   if (!member) return;
 
-  await addDoc(
-    collection(
-      db,
-      'distributions'
-    ),
-
-    {
-      userId:
-        auth.currentUser?.uid,
-
-      memberId:
-        member.id,
-
-      memberName:
-        member.name,
-
-      amount:
-        Number(amount),
-
-      month:
-        selectedMonth,
-
-      year:
-        selectedYear,
-
-      monthKey:
-        `${selectedYear}-${selectedMonth}`,
-
-      distributedAt:
-        new Date()
-          .toISOString(),
-
-      status:
-        'given',
-
-      note: '',
-    }
+  await addDistribution(
+    member.id,
+    selectedMonth,
+    selectedYear,
+    Number(amount),
   );
 
   alert(

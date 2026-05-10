@@ -1,8 +1,6 @@
 import {
   doc,
-  setDoc,
-  collection,
-  addDoc
+  setDoc
 } from 'firebase/firestore';
 
 import {
@@ -49,46 +47,14 @@ export async function setupFirestore() {
     plan: 'free',
   });
 
-  /* PROJECT */
-
-  const projectRef = doc(
-    db,
-    'users',
-    user.uid,
-    'projects',
-    'default-project'
-  );
-
-  await setDoc(projectRef, {
-
-    projectName:
-      'Main Chit',
-
-    totalMembers: 60,
-
-    monthlyAmount: 2000,
-
-    startMonth: 1,
-
-    startYear: 2026,
-
-    active: true,
-
-    createdAt:
-      new Date()
-        .toISOString(),
-  });
-
   /* SETTINGS */
 
   const settingsRef = doc(
     db,
     'users',
     user.uid,
-    'projects',
-    'default-project',
     'settings',
-    'config'
+    'chit'
   );
 
   await setDoc(settingsRef, {
@@ -97,41 +63,32 @@ export async function setupFirestore() {
 
     monthlyAmount: 500,
 
+    interestRate: 2,
+
+    durationMonths: 36,
+
     totalMembers: 60,
 
-    currency: 'INR',
+    startMonth: 4,
 
-    theme: 'dark',
+    startYear: 2026,
   });
 
   /* SAMPLE MEMBER */
 
-  await addDoc(
-
-    collection(
-      db,
-      'users',
-      user.uid,
-      'projects',
-      'default-project',
-      'members'
-    ),
-
+  await setDoc(
+    doc(db, 'users', user.uid, 'members', '1'),
     {
       name: 'Sample Member',
-
       phone: '9876543210',
-
+      joinDate: new Date().toLocaleDateString(),
       balance: 0,
-
+      principalPaid: 0,
       totalPaid: 0,
-
-      joinDate:
-        new Date()
-          .toISOString(),
-
       active: true,
-    }
+      notes: '',
+    },
+    { merge: true }
   );
 
   alert(

@@ -8,56 +8,17 @@ import { MONTHS } from "@/types";
 
 import { useChitFund } from "../context/ChitFundContext";
 
-import { getMonthAmount } from "@/lib/payment";
-
 import { setupFirestore } from "../setupFirestore";
 
 export function DashboardPage() {
-  const { state, dispatch } = useChitFund();
+  const { state, markAllPaidForMonth } = useChitFund();
 
   const [month, setMonth] = useState(state.settings.startMonth);
 
   const [year, setYear] = useState(state.settings.startYear);
 
-  const handleMarkAllPaid = () => {
-    const updatedPayments = state.members.map((member) => {
-      const contribution = getMonthAmount(month, year, state.settings);
-
-      const interest = (member.balance * state.settings.interestRate) / 100;
-
-      const principalPaid = 0;
-
-      const totalPaid = contribution + principalPaid + interest;
-
-      return {
-        id: crypto.randomUUID(),
-
-        memberId: member.id,
-
-        month,
-
-        year,
-
-        previousBalance: member.balance,
-
-        contribution,
-
-        principalPaid,
-
-        interest,
-
-        totalPaid,
-
-        newBalance: member.balance,
-
-        paidAt: new Date().toISOString(),
-      };
-    });
-
-    dispatch({
-      type: "MARK_ALL_PAID",
-      payload: updatedPayments,
-    });
+  const handleMarkAllPaid = async () => {
+    await markAllPaidForMonth(month, year);
   };
 
   return (

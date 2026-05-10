@@ -8,9 +8,9 @@ export function SettingsPage() {
   const [form, setForm] = useState(initialForm);
   const [saved, setSaved] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateSettings(form);
+    await updateSettings(form);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };

@@ -3,6 +3,8 @@ import { useChitFund } from "../context/ChitFundContext";
 import { formatINR } from "@/lib/utils";
 import { Plus, Pencil, Trash2, Search, X } from "lucide-react";
 import * as XLSX from "xlsx";
+import { auth, db } from "@/lib/firebase";
+import { doc, writeBatch } from "firebase/firestore";
 
 interface MemberFormData {
   name: string;
@@ -10,7 +12,7 @@ interface MemberFormData {
 }
 
 export function MemberListPage() {
-  const { state, dispatch, addMember, updateMember, deleteMember } =
+  const { state, dispatch, addMember, updateMember, deleteMember, reloadFromFirestore } =
     useChitFund();
   const [searchQuery, setSearchQuery] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -27,15 +29,15 @@ export function MemberListPage() {
       (m.id || "").toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingMember) {
       const member = state.members.find((m) => m.id === editingMember);
       if (member) {
-        updateMember({ ...member, ...formData });
+        await updateMember({ ...member, ...formData });
       }
     } else {
-      addMember(formData);
+      await addMember(formData);
     }
     setShowForm(false);
     setEditingMember(null);
@@ -65,6 +67,12 @@ export function MemberListPage() {
     setIsImporting(true);
 
     try {
+      const user = auth.currentUser;
+      if (!user) {
+        alert("User not logged in");
+        return;
+      }
+
       const data = await file.arrayBuffer();
 
       const workbook = XLSX.read(data);
@@ -104,6 +112,12 @@ export function MemberListPage() {
         });
       }
 
+      const batch = writeBatch(db);
+      for (const m of importedMembers) {
+        batch.set(doc(db, "users", user.uid, "members", m.id), m, { merge: true });
+      }
+      await batch.commit();
+
       dispatch({
         type: "SET_STATE",
 
@@ -113,6 +127,7 @@ export function MemberListPage() {
       });
 
       alert("Members imported successfully");
+      await reloadFromFirestore();
     } catch (error) {
       console.error(error);
 
@@ -296,13 +311,13 @@ export function MemberListPage() {
                           <Pencil className="w-3.5 h-3.5 text-[#6c757d]" />
                         </button>
                         <button
-                          onClick={() => {
+                          onClick={async () => {
                             if (
                               confirm(
                                 "Are you sure you want to delete this member?",
                               )
                             ) {
-                              deleteMember(member.id);
+                              await deleteMember(member.id);
                             }
                           }}
                           className="p-1.5 rounded hover:bg-[#f8d7da] transition-colors"
