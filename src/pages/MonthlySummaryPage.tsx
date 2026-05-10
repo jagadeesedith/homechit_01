@@ -1,6 +1,7 @@
 import { useChitFund } from '../context/ChitFundContext';
 import { formatINR } from '@/lib/utils';
 import { MONTHS } from '@/types';
+import { Calendar, TrendingUp, Users, CheckCircle, XCircle, DollarSign } from 'lucide-react';
 
 export function MonthlySummaryPage() {
   const { state, setSelectedMonthYear } = useChitFund();
@@ -23,75 +24,171 @@ export function MonthlySummaryPage() {
     total: payments.reduce((s, p) => s + p.totalPaid, 0),
   };
 
-  return (
-    <div>
-      <h1 className="text-2xl font-semibold text-[#1d1d1d] mb-6">Monthly Summary</h1>
+  const paidPercentage = state.members.length > 0 ? Math.round((payments.length / state.members.length) * 100) : 0;
 
-      <div className="flex items-center gap-3 mb-6">
-        <div className="flex gap-2 flex-wrap">
-          {MONTHS.map((m, i) => {
-            const monthNum = i + 1;
-            const isActive = selectedMonth === monthNum;
-            return (
-              <button
-                key={m}
-                onClick={() => setSelectedMonthYear(monthNum, selectedYear)}
-                className={`
-                  px-4 py-1.5 rounded-full text-sm font-medium transition-colors duration-200
-                  ${isActive
-                    ? 'bg-[#004b87] text-white'
-                    : 'bg-white border border-[#e9ecef] text-[#6c757d] hover:bg-[#f8f9fa]'
-                  }
-                `}
-              >
-                {m.slice(0, 3)}
-              </button>
-            );
-          })}
+  return (
+    <div className="pt-16 lg:pt-0">
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+            <Calendar className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-black text-gray-900 tracking-tight">Monthly Summary</h1>
+            <p className="text-gray-600 text-sm font-medium">Detailed payment breakdown and analytics</p>
+          </div>
         </div>
-        <select
-          value={selectedYear}
-          onChange={(e) => setSelectedMonthYear(selectedMonth, Number(e.target.value))}
-          className="text-sm rounded-lg border border-[#e9ecef] px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#004b87]"
-        >
-          {years.map(y => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </select>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-6 shadow-lg">
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-2xl font-black text-blue-900">{formatINR(totals.total)}</span>
+            </div>
+            <p className="text-sm font-medium text-blue-800">Total Collected</p>
+            <p className="text-xs text-blue-600 mt-1">From all members</p>
+          </div>
+
+          <div className="bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-100 rounded-2xl p-6 shadow-lg">
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-2xl font-black text-emerald-900">{payments.length}</span>
+            </div>
+            <p className="text-sm font-medium text-emerald-800">Members Paid</p>
+            <p className="text-xs text-emerald-600 mt-1">{paidPercentage}% completion rate</p>
+          </div>
+
+          <div className="bg-gradient-to-br from-rose-50 to-red-50 border border-rose-100 rounded-2xl p-6 shadow-lg">
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-10 h-10 bg-rose-500 rounded-xl flex items-center justify-center">
+                <XCircle className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-2xl font-black text-rose-900">{state.members.length - payments.length}</span>
+            </div>
+            <p className="text-sm font-medium text-rose-800">Members Pending</p>
+            <p className="text-xs text-rose-600 mt-1">Awaiting payment</p>
+          </div>
+
+          <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100 rounded-2xl p-6 shadow-lg">
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-2xl font-black text-amber-900">{formatINR(totals.interest)}</span>
+            </div>
+            <p className="text-sm font-medium text-amber-800">Total Interest</p>
+            <p className="text-xs text-amber-600 mt-1">Generated this month</p>
+          </div>
+        </div>
+
+        {/* Month/Year Selector */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-lg mb-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Select Period</h3>
+              <p className="text-sm text-gray-600">Choose month and year to view summary</p>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-3">
+              {/* Month Pills */}
+              <div className="flex flex-wrap gap-2 p-1 bg-gray-50 rounded-xl">
+                {MONTHS.map((m, i) => {
+                  const monthNum = i + 1;
+                  const isActive = selectedMonth === monthNum;
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => setSelectedMonthYear(monthNum, selectedYear)}
+                      className={`
+                        px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200
+                        ${isActive
+                          ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md'
+                          : 'text-gray-600 hover:bg-white hover:shadow-sm'
+                        }
+                      `}
+                    >
+                      {m.slice(0, 3)}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Year Selector */}
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedMonthYear(selectedMonth, Number(e.target.value))}
+                className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 shadow-sm hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+              >
+                {years.map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-[#e9ecef] overflow-hidden">
+      {/* Payment Details Table */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden">
+        <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Payment Details</h3>
+              <p className="text-sm text-gray-600">Individual member payment breakdown</p>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <Users className="w-4 h-4" />
+              <span>{state.members.length} Total Members</span>
+            </div>
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-[#e9ecef]">
-                <th className="text-left text-xs font-semibold text-[#6c757d] uppercase tracking-wider px-4 py-3">Member ID</th>
-                <th className="text-left text-xs font-semibold text-[#6c757d] uppercase tracking-wider px-4 py-3">Name</th>
-                <th className="text-right text-xs font-semibold text-[#6c757d] uppercase tracking-wider px-4 py-3">Contribution</th>
-                <th className="text-right text-xs font-semibold text-[#6c757d] uppercase tracking-wider px-4 py-3">Principal</th>
-                <th className="text-right text-xs font-semibold text-[#6c757d] uppercase tracking-wider px-4 py-3">Interest</th>
-                <th className="text-right text-xs font-semibold text-[#6c757d] uppercase tracking-wider px-4 py-3">Total Paid</th>
-                <th className="text-center text-xs font-semibold text-[#6c757d] uppercase tracking-wider px-4 py-3">Status</th>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="text-left text-xs font-bold text-gray-700 uppercase tracking-wider px-6 py-4">Member ID</th>
+                <th className="text-left text-xs font-bold text-gray-700 uppercase tracking-wider px-6 py-4">Name</th>
+                <th className="text-right text-xs font-bold text-gray-700 uppercase tracking-wider px-6 py-4">Contribution</th>
+                <th className="text-right text-xs font-bold text-gray-700 uppercase tracking-wider px-6 py-4">Principal</th>
+                <th className="text-right text-xs font-bold text-gray-700 uppercase tracking-wider px-6 py-4">Interest</th>
+                <th className="text-right text-xs font-bold text-gray-700 uppercase tracking-wider px-6 py-4">Total Paid</th>
+                <th className="text-center text-xs font-bold text-gray-700 uppercase tracking-wider px-6 py-4">Status</th>
               </tr>
             </thead>
-            <tbody>
-              {state.members.map((member) => {
+            <tbody className="divide-y divide-gray-100">
+              {[...state.members].sort((a, b) => parseInt(a.id) - parseInt(b.id)).map((member, index) => {
                 const payment = payments.find(p => p.memberId === member.id);
                 const isPaid = paidMemberIds.has(member.id);
 
                 return (
-                  <tr key={member.id} className="border-b border-[#e9ecef] hover:bg-[#f8f9fa] transition-colors">
-                    <td className="px-4 py-3 text-sm text-[#1d1d1d] font-medium">{member.id}</td>
-                    <td className="px-4 py-3 text-sm text-[#1d1d1d]">{member.name}</td>
-                    <td className="px-4 py-3 text-sm text-[#1d1d1d] text-right">{payment ? formatINR(payment.contribution) : '-'}</td>
-                    <td className="px-4 py-3 text-sm text-[#1d1d1d] text-right">{payment ? formatINR(payment.principalPaid) : '-'}</td>
-                    <td className="px-4 py-3 text-sm text-[#1d1d1d] text-right">{payment ? formatINR(payment.interest) : '-'}</td>
-                    <td className="px-4 py-3 text-sm text-[#1d1d1d] text-right font-medium">{payment ? formatINR(payment.totalPaid) : '-'}</td>
-                    <td className="px-4 py-3 text-center">
+                  <tr 
+                    key={member.id} 
+                    className={`hover:bg-gray-50 transition-colors duration-150 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}
+                  >
+                    <td className="px-6 py-4 text-sm font-semibold text-gray-900">{member.id}</td>
+                    <td className="px-6 py-4 text-sm text-gray-700 font-medium">{member.name}</td>
+                    <td className="px-6 py-4 text-sm text-gray-700 text-right">{payment ? formatINR(payment.contribution) : '-'}</td>
+                    <td className="px-6 py-4 text-sm text-gray-700 text-right">{payment ? formatINR(payment.principalPaid) : '-'}</td>
+                    <td className="px-6 py-4 text-sm text-gray-700 text-right">{payment ? formatINR(payment.interest) : '-'}</td>
+                    <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">{payment ? formatINR(payment.totalPaid) : '-'}</td>
+                    <td className="px-6 py-4 text-center">
                       {isPaid ? (
-                        <span className="inline-block bg-[#d1f2d9] text-[#28a745] rounded px-2 py-0.5 text-xs font-medium">Paid</span>
+                        <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold">
+                          <CheckCircle className="w-3 h-3" />
+                          Paid
+                        </span>
                       ) : (
-                        <span className="inline-block bg-[#f8d7da] text-[#dc3545] rounded px-2 py-0.5 text-xs font-medium">Unpaid</span>
+                        <span className="inline-flex items-center gap-1 px-3 py-1 bg-rose-100 text-rose-800 rounded-full text-xs font-bold">
+                          <XCircle className="w-3 h-3" />
+                          Unpaid
+                        </span>
                       )}
                     </td>
                   </tr>
@@ -99,13 +196,17 @@ export function MonthlySummaryPage() {
               })}
             </tbody>
             <tfoot>
-              <tr className="bg-[#f8f9fa] font-semibold">
-                <td className="px-4 py-3 text-sm text-[#1d1d1d]" colSpan={2}>Totals</td>
-                <td className="px-4 py-3 text-sm text-[#1d1d1d] text-right">{formatINR(totals.contribution)}</td>
-                <td className="px-4 py-3 text-sm text-[#1d1d1d] text-right">{formatINR(totals.principal)}</td>
-                <td className="px-4 py-3 text-sm text-[#1d1d1d] text-right">{formatINR(totals.interest)}</td>
-                <td className="px-4 py-3 text-sm text-[#004b87] text-right">{formatINR(totals.total)}</td>
-                <td className="px-4 py-3 text-center text-sm text-[#6c757d]">{payments.length} / {state.members.length}</td>
+              <tr className="bg-gradient-to-r from-gray-100 to-gray-50 font-bold">
+                <td className="px-6 py-4 text-sm text-gray-900" colSpan={2}>Totals</td>
+                <td className="px-6 py-4 text-sm text-gray-900 text-right font-bold">{formatINR(totals.contribution)}</td>
+                <td className="px-6 py-4 text-sm text-gray-900 text-right font-bold">{formatINR(totals.principal)}</td>
+                <td className="px-6 py-4 text-sm text-gray-900 text-right font-bold">{formatINR(totals.interest)}</td>
+                <td className="px-6 py-4 text-sm text-blue-600 text-right font-black">{formatINR(totals.total)}</td>
+                <td className="px-6 py-4 text-center">
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-bold">
+                    {payments.length} / {state.members.length}
+                  </span>
+                </td>
               </tr>
             </tfoot>
           </table>

@@ -1,6 +1,6 @@
 import { useChitFund } from '../context/ChitFundContext';
 import { formatINR } from '@/lib/utils';
-import { Wallet, AlertCircle, Banknote, TrendingUp } from 'lucide-react';
+import { Wallet, AlertCircle, Banknote, TrendingUp, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 interface SummaryCardsProps {
   month: number;
@@ -31,88 +31,146 @@ const currentTarget = contributionAmount * totalMembers;
 
   const projectedInterest = payments.reduce((sum, p) => sum + p.interest, 0);
 
+  const collectionRate = currentTarget > 0 ? Math.round((totalCollected / currentTarget) * 100) : 0;
+  
   const cards = [
     {
       label: 'Total Collected',
       value: formatINR(totalCollected),
-      subtext: `of ${formatINR(currentTarget)} target`,
+      subtext: `${collectionRate}% of ${formatINR(currentTarget)} target`,
       icon: Wallet,
+      trend: collectionRate >= 75 ? 'up' : 'down',
+      percentage: collectionRate
     },
     {
       label: 'Outstanding',
       value: formatINR(outstanding),
       subtext: `${unpaidCount} members pending`,
       icon: AlertCircle,
+      trend: unpaidCount === 0 ? 'up' : 'down',
+      percentage: unpaidCount
     },
     {
       label: 'Active Loans',
       value: formatINR(totalLoaned),
-      subtext: `Given to ${state.members.filter(m => m.balance > 0).length} members`,
+      subtext: `${state.members.filter(m => m.balance > 0).length} members`,
       icon: Banknote,
+      trend: totalLoaned > 0 ? 'up' : 'neutral',
+      percentage: state.members.filter(m => m.balance > 0).length
     },
     {
       label: 'Projected Interest',
       value: formatINR(projectedInterest),
       subtext: 'Based on current balances',
       icon: TrendingUp,
+      trend: projectedInterest > 0 ? 'up' : 'neutral',
+      percentage: projectedInterest > 0 ? Math.round((projectedInterest / totalCollected) * 100) : 0
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
-      {cards.map((card) => {
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+      {cards.map((card, index) => {
         const Icon = card.icon;
 
         const theme =
           card.label === 'Total Collected'
             ? {
-                bg: 'from-blue-50 to-indigo-100',
-                border: 'border-blue-200',
-                labelText: 'text-blue-800',
-                iconTint: 'text-blue-700',
+                bg: 'from-blue-500/5 to-indigo-500/5',
+                border: 'border-blue-200/50',
+                labelText: 'text-blue-700',
+                iconTint: 'text-blue-600',
+                iconBg: 'bg-blue-100',
+                progressBg: 'bg-blue-500'
               }
             : card.label === 'Outstanding'
               ? {
-                  bg: 'from-rose-50 to-red-100',
-                  border: 'border-red-200',
-                  labelText: 'text-red-800',
-                  iconTint: 'text-red-700',
+                  bg: 'from-rose-500/5 to-red-500/5',
+                  border: 'border-red-200/50',
+                  labelText: 'text-red-700',
+                  iconTint: 'text-red-600',
+                  iconBg: 'bg-red-100',
+                  progressBg: 'bg-red-500'
                 }
               : card.label === 'Active Loans'
                 ? {
-                    bg: 'from-emerald-50 to-green-100',
-                    border: 'border-green-200',
-                    labelText: 'text-emerald-800',
-                    iconTint: 'text-emerald-700',
+                    bg: 'from-emerald-500/5 to-green-500/5',
+                    border: 'border-green-200/50',
+                    labelText: 'text-emerald-700',
+                    iconTint: 'text-emerald-600',
+                    iconBg: 'bg-emerald-100',
+                    progressBg: 'bg-emerald-500'
                   }
                 : {
-                    bg: 'from-amber-50 to-orange-100',
-                    border: 'border-amber-200',
-                    labelText: 'text-amber-900',
-                    iconTint: 'text-amber-700',
-                  };
+                    bg: 'from-amber-500/5 to-orange-500/5',
+                    border: 'border-amber-200/50',
+                    labelText: 'text-amber-700',
+                    iconTint: 'text-amber-600',
+                    iconBg: 'bg-amber-100',
+                    progressBg: 'bg-amber-500'
+                };
 
         return (
           <div
             key={card.label}
-            className={`relative overflow-hidden bg-white/70 backdrop-blur p-6 rounded-3xl border ${theme.border} shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1`}
+            className="group relative overflow-hidden bg-white rounded-2xl border border-gray-200/60 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-1 hover:border-gray-300/80"
+            style={{ animationDelay: `${index * 100}ms` }}
           >
-            <div className={`absolute inset-0 bg-gradient-to-br ${theme.bg} opacity-70`} />
-            <div className="absolute -top-10 -right-10 h-24 w-24 rounded-full bg-gradient-to-br from-blue-600/20 to-indigo-600/10 blur-2xl" />
+            {/* Background gradient */}
+            <div className={`absolute inset-0 bg-gradient-to-br ${theme.bg} opacity-100`} />
+            
+            {/* Decorative circles */}
+            <div className="absolute -top-6 -right-6 h-20 w-20 rounded-full bg-gradient-to-br from-white/30 to-transparent blur-xl" />
+            <div className="absolute -bottom-4 -left-4 h-16 w-16 rounded-full bg-gradient-to-br from-white/20 to-transparent blur-lg" />
 
-            <div className="relative">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-9 h-9 rounded-2xl bg-white/60 border border-white/60 shadow-sm flex items-center justify-center">
-                  <Icon className={`w-4 h-4 ${theme.iconTint}`} />
+            <div className="relative p-6">
+              {/* Header with icon and label */}
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className={`w-12 h-12 rounded-xl ${theme.iconBg} border border-white/60 shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
+                    <Icon className={`w-6 h-6 ${theme.iconTint}`} />
+                  </div>
+                  <div>
+                    <span className={`text-sm font-semibold ${theme.labelText}`}>{card.label}</span>
+                    <div className="flex items-center gap-1 mt-1">
+                      {card.trend === 'up' && <ArrowUpRight className="w-3 h-3 text-green-600" />}
+                      {card.trend === 'down' && <ArrowDownRight className="w-3 h-3 text-red-500" />}
+                      <span className="sr-only">{card.subtext}</span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <span className={`text-xs font-medium ${theme.labelText}`}>{card.label}</span>
-                  <span className="sr-only">{card.subtext}</span>
+                
+                {/* Trend indicator */}
+                <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                  card.trend === 'up' ? 'bg-green-100 text-green-700' : 
+                  card.trend === 'down' ? 'bg-red-100 text-red-600' : 
+                  'bg-gray-100 text-gray-600'
+                }`}>
+                  {card.trend === 'up' ? '↑' : card.trend === 'down' ? '↓' : '→'}
                 </div>
               </div>
 
-              <div className="text-2xl font-extrabold tracking-tight text-slate-900">{card.value}</div>
-              <div className="text-xs text-slate-600 mt-1">{card.subtext}</div>
+              {/* Main value */}
+              <div className="text-3xl font-black tracking-tight text-gray-900 mb-2">
+                {card.value}
+              </div>
+
+              {/* Subtext */}
+              <div className="text-sm text-gray-600 mb-3">
+                {card.subtext}
+              </div>
+
+              {/* Progress bar */}
+              <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                <div 
+                  className={`h-full ${theme.progressBg} rounded-full transition-all duration-1000 ease-out`}
+                  style={{ 
+                    width: `${Math.min(100, card.label === 'Total Collected' ? card.percentage : 
+                              card.label === 'Outstanding' ? Math.max(0, 100 - card.percentage) : 
+                              Math.min(100, card.percentage * 10))}%` 
+                  }}
+                />
+              </div>
             </div>
           </div>
         );

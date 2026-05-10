@@ -1,10 +1,8 @@
 import { SummaryCards } from "@/components/SummaryCards";
-
 import { MemberGrid } from "@/components/MemberGrid";
-
 import { MONTHS } from "@/types";
-
 import { useChitFund } from "../context/ChitFundContext";
+import { Calendar, ChevronDown, Users, TrendingUp } from "lucide-react";
 
 export function DashboardPage() {
   const { state, markAllPaidForMonth, setSelectedMonthYear } = useChitFund();
@@ -23,57 +21,106 @@ export function DashboardPage() {
 
   return (
     <div className="pt-16 lg:pt-0">
-      <div className="mb-8 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-[#1d1d1d]">
-            {MONTHS[month - 1]} {year}
-          </h1>
+      {/* Header Section */}
+      <div className="mb-8">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Calendar className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-black text-gray-900 tracking-tight">
+                  {MONTHS[month - 1]} {year}
+                </h1>
+                <p className="text-gray-600 text-sm font-medium">
+                  Dashboard Overview
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 text-sm text-gray-600">
+              <div className="flex items-center gap-1.5">
+                <Users className="w-4 h-4" />
+                <span>{state.members.length} Members</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <TrendingUp className="w-4 h-4" />
+                <span>Active Period</span>
+              </div>
+            </div>
+          </div>
 
-          <p className="text-sm text-[#6c757d] mt-1">
-            Click on a member box to record their payment
-          </p>
+          <div className="flex flex-wrap gap-3">
+            {/* Month Selector */}
+            <div className="relative">
+              <select
+                value={month}
+                onChange={(e) => setSelectedMonthYear(Number(e.target.value), year)}
+                className="appearance-none bg-white border border-gray-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-gray-700 shadow-sm hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+              >
+                {MONTHS.map((m, index) => (
+                  <option key={m} value={index + 1}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            </div>
+
+            {/* Year Selector */}
+            <div className="relative">
+              <select
+                value={year}
+                onChange={(e) => setSelectedMonthYear(month, Number(e.target.value))}
+                className="appearance-none bg-white border border-gray-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-gray-700 shadow-sm hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+              >
+                {years.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            </div>
+
+            {/* Mark All Paid */}
+            <button
+              onClick={handleMarkAllPaid}
+              className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl text-sm font-semibold shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-200 flex items-center gap-2"
+            >
+              <div className="w-4 h-4 bg-white/20 rounded-full flex items-center justify-center">
+                <span className="text-xs">✓</span>
+              </div>
+              Mark All Paid
+            </button>
+          </div>
         </div>
 
-        <div className="flex flex-wrap gap-3">
-          {/* Month Selector */}
-          <select
-            value={month}
-            onChange={(e) => setSelectedMonthYear(Number(e.target.value), year)}
-            className="border rounded-lg px-3 py-2"
-          >
-            {MONTHS.map((m, index) => (
-              <option key={m} value={index + 1}>
-                {m}
-              </option>
-            ))}
-          </select>
-
-          {/* Year Selector */}
-          <select
-            value={year}
-            onChange={(e) => setSelectedMonthYear(month, Number(e.target.value))}
-            className="border rounded-lg px-3 py-2"
-          >
-            {years.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
-
-          {/* Mark All Paid */}
-          <button
-            onClick={handleMarkAllPaid}
-            className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl text-sm font-medium shadow-lg hover:scale-[1.02] transition-all duration-200"
-          >
-            Mark All as Paid
-          </button>
+        {/* Quick Stats Bar */}
+        <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-blue-800 font-medium">
+              💡 Click on any member card below to record their payment for this month
+            </p>
+            <div className="flex items-center gap-2 text-xs text-blue-600">
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+              Live Data
+            </div>
+          </div>
         </div>
       </div>
 
       <SummaryCards month={month} year={year} />
 
-      <MemberGrid month={month} year={year} />
+      <div className="mt-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Member Payment Status</h2>
+            <p className="text-sm text-gray-600 mt-1">Track and manage monthly contributions</p>
+          </div>
+        </div>
+        <MemberGrid month={month} year={year} />
+      </div>
     </div>
   );
 }

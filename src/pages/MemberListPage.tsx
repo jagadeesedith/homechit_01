@@ -23,11 +23,13 @@ export function MemberListPage() {
   });
   const [isImporting, setIsImporting] = useState(false);
 
-  const filteredMembers = state.members.filter(
-    (m) =>
-      m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (m.id || "").toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const filteredMembers = [...state.members]
+    .sort((a, b) => parseInt(a.id) - parseInt(b.id))
+    .filter(
+      (m) =>
+        m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (m.id || "").toLowerCase().includes(searchQuery.toLowerCase()),
+    );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

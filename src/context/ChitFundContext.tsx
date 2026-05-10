@@ -39,6 +39,7 @@ type Action =
       payload: { payment: MonthlyPayment; updatedMember: Member };
     }
   | { type: "ADD_DISTRIBUTION"; payload: Distribution }
+  | { type: "DELETE_DISTRIBUTION"; payload: string }
   | { type: "MARK_ALL_PAID"; payload: MonthlyPayment[] }
   | { type: "UPDATE_SETTINGS"; payload: Settings };
 
@@ -112,6 +113,13 @@ function reducer(state: State, action: Action): State {
       return { ...state, distributions: newDistributions };
     }
 
+    case "DELETE_DISTRIBUTION": {
+      const newDistributions = state.distributions.filter(
+        (d) => d.id !== action.payload
+      );
+      return { ...state, distributions: newDistributions };
+    }
+
     case "UPDATE_SETTINGS": {
       return { ...state, settings: action.payload };
     }
@@ -149,6 +157,7 @@ interface ContextValue {
     year: number,
     amount: number,
   ) => Promise<void>;
+  deleteDistribution: (distributionId: string) => Promise<void>;
   updateSettings: (settings: Settings) => Promise<void>;
 
   getMemberPayments: (memberId: string) => MonthlyPayment[];
@@ -385,7 +394,8 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
         .map((p) => p.memberId),
     );
 
-    const payments: MonthlyPayment[] = state.members
+    const payments: MonthlyPayment[] = [...state.members]
+      .sort((a, b) => parseInt(a.id) - parseInt(b.id))
       .filter((m) => !alreadyPaid.has(m.id))
       .map((member) => {
       const isFirstMonth =
@@ -471,6 +481,37 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "ADD_DISTRIBUTION", payload: distribution });
   };
 
+  const deleteDistribution = async (distributionId: string) => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const distribution = state.distributions.find(d => d.id === distributionId);
+    if (!distribution) return;
+
+    const member = state.members.find((m) => m.id === distribution.memberId);
+    if (!member) return;
+
+    // Update member balance (subtract the distributed amount)
+    const updatedMember: Member = {
+      ...member,
+      balance: Math.max(0, member.balance - distribution.amount),
+    };
+
+    const batch = writeBatch(db);
+    // Delete the distribution document
+    batch.delete(doc(db, "users", user.uid, "distributions", distributionId));
+    // Update the member document
+    batch.set(
+      doc(db, "users", user.uid, "members", updatedMember.id),
+      updatedMember,
+      { merge: true },
+    );
+    await batch.commit();
+
+    dispatch({ type: "UPDATE_MEMBER", payload: updatedMember });
+    dispatch({ type: "DELETE_DISTRIBUTION", payload: distributionId });
+  };
+
   const updateSettings = async (settings: Settings) => {
     const user = auth.currentUser;
     if (!user) return;
@@ -534,6 +575,7 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
         recordPayment,
         markAllPaidForMonth,
         addDistribution,
+        deleteDistribution,
         updateSettings,
         getMemberPayments,
         getMonthPayments,
