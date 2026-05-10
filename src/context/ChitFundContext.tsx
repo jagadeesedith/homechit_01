@@ -4,7 +4,8 @@ import {
   useReducer,
   useEffect,
   type ReactNode,
-} from "react";
+}
+  from "react";
 import type { Member, MonthlyPayment, Distribution, Settings } from "@/types";
 import {
   setMembers,
@@ -14,7 +15,7 @@ import {
 } from "@/lib/storage";
 import { generateId } from "@/lib/utils";
 import { db, auth } from "@/lib/firebase";
-import { getDocs, collection, doc, setDoc } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc } from "@firebase/firestore";
 
 interface State {
   members: Member[];
@@ -30,9 +31,9 @@ type Action =
   | { type: "UPDATE_MEMBER"; payload: Member }
   | { type: "DELETE_MEMBER"; payload: string }
   | {
-      type: "RECORD_PAYMENT";
-      payload: { payment: MonthlyPayment; updatedMember: Member };
-    }
+    type: "RECORD_PAYMENT";
+    payload: { payment: MonthlyPayment; updatedMember: Member };
+  }
   | { type: "ADD_DISTRIBUTION"; payload: Distribution }
   | { type: "MARK_ALL_PAID"; payload: MonthlyPayment[] }
   | { type: "UPDATE_SETTINGS"; payload: Settings };
@@ -156,48 +157,51 @@ export function ChitFundProvider({
   });
 
   useEffect(() => {
-    const loadData = async () => {
+    const loadFirestoreData = async (uid: string) => {
       try {
-        const user = auth.currentUser;
-        if (!user) return;
-
-        const userId = user.uid;
-
         // Members
         const membersSnapshot = await getDocs(
-          collection(db, "users", userId, "members"),
+          collection(db, "users", uid, "members")
         );
-        const members: Member[] = membersSnapshot.docs.map((doc) => ({
+
+        const members = membersSnapshot.docs.map((doc: any) => ({
           id: doc.id,
-          ...(doc.data() as Omit<Member, "id">),
-        }));
+          ...doc.data(),
+        })) as Member[];
 
         // Payments
         const paymentsSnapshot = await getDocs(
-          collection(db, "users", userId, "payments"),
+          collection(db, "users", uid, "payments")
         );
-        const payments: MonthlyPayment[] = paymentsSnapshot.docs.map((doc) => ({
+
+        const payments = paymentsSnapshot.docs.map((doc: any) => ({
           id: doc.id,
-          ...(doc.data() as Omit<MonthlyPayment, "id">),
-        }));
+          ...doc.data(),
+        })) as MonthlyPayment[];
 
         dispatch({
           type: "LOAD_DATA",
           payload: {
             members,
             payments,
-            distributions: state.distributions,
-            settings: state.settings,
+            distributions: [],
+            settings: defaultSettings,
           },
         });
       } catch (error) {
-        console.error("Load data error:", error);
+        console.error("Firestore load error:", error);
       }
     };
 
-    loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Ensure we load once auth is ready (avoids stale/empty state)
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (!user?.uid) return;
+      loadFirestoreData(user.uid);
+    });
+
+    return () => unsubscribe();
   }, []);
+
 
   const addMember = async (memberData: { name: string; phone: string }) => {
     try {
