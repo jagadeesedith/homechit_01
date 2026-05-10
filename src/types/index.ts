@@ -4,6 +4,8 @@ export interface Member {
   phone: string;
   joinDate: string;
   balance: number;
+  active?: boolean;
+  notes?: string;
 }
 
 export interface MonthlyPayment {

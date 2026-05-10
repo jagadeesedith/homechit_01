@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { SummaryCards } from "@/components/SummaryCards";
 
@@ -16,6 +16,11 @@ export function DashboardPage() {
   const [month, setMonth] = useState(state.settings.startMonth);
 
   const [year, setYear] = useState(state.settings.startYear);
+
+  useEffect(() => {
+    setMonth(state.settings.startMonth);
+    setYear(state.settings.startYear);
+  }, [state.settings.startMonth, state.settings.startYear]);
 
   const handleMarkAllPaid = async () => {
     await markAllPaidForMonth(month, year);

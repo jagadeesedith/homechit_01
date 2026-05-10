@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import * as XLSX from 'xlsx';
-import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { useChitFund } from '../context/ChitFundContext';
 import { formatINR } from '@/lib/utils';
 import { MONTHS } from '@/types';
@@ -65,12 +65,17 @@ export function MemberHistoryPage() {
           { merge: true }
         );
 
-        await addDoc(
-          collection(db, 'users', userId, 'payments'),
+        const month = Number(row.Month || 0);
+        const year = Number(row.Year || 0);
+        const paymentId = `${year}-${String(month).padStart(2, '0')}-${memberId}`;
+
+        await setDoc(
+          doc(db, 'users', userId, 'payments', paymentId),
           {
+            id: paymentId,
             memberId,
-            month: Number(row.Month || 0),
-            year: Number(row.Year || 0),
+            month,
+            year,
             previousBalance: Number(row.PreviousBalance || 0),
             contribution: Number(row.ChitAmount || 0),
             principalPaid: Number(row.PrincipalPaid || 0),
@@ -78,7 +83,8 @@ export function MemberHistoryPage() {
             totalPaid: Number(row.TotalPaid || 0),
             newBalance: Number(row.NewBalance || 0),
             paidAt: new Date().toISOString(),
-          }
+          },
+          { merge: true }
         );
       }
 

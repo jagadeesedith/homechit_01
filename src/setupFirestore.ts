@@ -83,8 +83,6 @@ export async function setupFirestore() {
       phone: '9876543210',
       joinDate: new Date().toLocaleDateString(),
       balance: 0,
-      principalPaid: 0,
-      totalPaid: 0,
       active: true,
       notes: '',
     },

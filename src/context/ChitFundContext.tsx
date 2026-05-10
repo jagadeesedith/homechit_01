@@ -19,13 +19,6 @@ import type { Distribution, Member, MonthlyPayment, Settings } from "@/types";
 import { generateId } from "@/lib/utils";
 import { db, auth } from "@/lib/firebase";
 
-import {
-  setDistributions,
-  setMembers,
-  setPayments,
-  setSettings,
-} from "@/lib/storage";
-
 interface State {
   members: Member[];
   payments: MonthlyPayment[];
@@ -56,6 +49,21 @@ const defaultSettings: Settings = {
   startYear: 2026,
 };
 
+function nextNumericMemberId(existing: Member[]): string {
+  let maxId = 0;
+  for (const m of existing) {
+    const digits = String(m.id).match(/\d+/g)?.join("") ?? "";
+    const n = Number(digits);
+    if (Number.isFinite(n)) maxId = Math.max(maxId, n);
+  }
+  return String(maxId + 1);
+}
+
+function paymentDocId(memberId: string, month: number, year: number): string {
+  // deterministic id prevents duplicates across refresh/import
+  return `${year}-${String(month).padStart(2, "0")}-${memberId}`;
+}
+
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "LOAD_DATA":
@@ -71,44 +79,35 @@ function reducer(state: State, action: Action): State {
       const updated = state.members.map((m) =>
         m.id === action.payload.id ? action.payload : m,
       );
-      setMembers(updated);
       return { ...state, members: updated };
     }
 
     case "DELETE_MEMBER": {
       const updated = state.members.filter((m) => m.id !== action.payload);
-      setMembers(updated);
       return { ...state, members: updated };
     }
 
     case "RECORD_PAYMENT": {
       const newPayments = [...state.payments, action.payload.payment];
-      setPayments(newPayments);
-
       const updatedMembers = state.members.map((m) =>
         m.id === action.payload.updatedMember.id
           ? action.payload.updatedMember
           : m,
       );
-      setMembers(updatedMembers);
-
       return { ...state, payments: newPayments, members: updatedMembers };
     }
 
     case "ADD_DISTRIBUTION": {
       const newDistributions = [...state.distributions, action.payload];
-      setDistributions(newDistributions);
       return { ...state, distributions: newDistributions };
     }
 
     case "UPDATE_SETTINGS": {
-      setSettings(action.payload);
       return { ...state, settings: action.payload };
     }
 
     case "MARK_ALL_PAID": {
       const updatedPayments = [...state.payments, ...action.payload];
-      setPayments(updatedPayments);
       return { ...state, payments: updatedPayments };
     }
 
@@ -245,13 +244,11 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
       phone: memberData.phone,
       joinDate: new Date().toISOString(),
       balance: 0,
-      principalPaid: 0,
-      totalPaid: 0,
       active: true,
       notes: "",
     };
 
-    const memberId = String(state.members.length + 1);
+    const memberId = nextNumericMemberId(state.members);
 
     await setDoc(
       doc(db, "users", user.uid, "members", memberId),
@@ -260,9 +257,8 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
     );
 
     dispatch({
-      type: "LOAD_DATA",
+      type: "SET_STATE",
       payload: {
-        ...state,
         members: [
           ...state.members,
           {
@@ -289,8 +285,6 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
     const user = auth.currentUser;
     if (!user) return;
 
-    // deleteDoc is intentionally not used here to avoid missing import changes;
-    // UI state will refresh on next reload.
     const batch = writeBatch(db);
     batch.delete(doc(db, "users", user.uid, "members", id));
     await batch.commit();
@@ -320,7 +314,7 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
     const newBalance = member.balance - principalPaid;
 
     const payment: MonthlyPayment = {
-      id: generateId(),
+      id: paymentDocId(memberId, month, year),
       memberId,
       month,
       year,
@@ -365,7 +359,15 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
     const user = auth.currentUser;
     if (!user) return;
 
-    const payments: MonthlyPayment[] = state.members.map((member) => {
+    const alreadyPaid = new Set(
+      state.payments
+        .filter((p) => p.month === month && p.year === year)
+        .map((p) => p.memberId),
+    );
+
+    const payments: MonthlyPayment[] = state.members
+      .filter((m) => !alreadyPaid.has(m.id))
+      .map((member) => {
       const isFirstMonth =
         month === state.settings.startMonth &&
         year === state.settings.startYear;
@@ -379,7 +381,7 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
       const totalPaid = contribution + principalPaid + interest;
 
       return {
-        id: generateId(),
+        id: paymentDocId(member.id, month, year),
         memberId: member.id,
         month,
         year,
@@ -401,7 +403,9 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
       await batch.commit();
     }
 
-    dispatch({ type: "MARK_ALL_PAID", payload: payments });
+    if (payments.length > 0) {
+      dispatch({ type: "MARK_ALL_PAID", payload: payments });
+    }
   };
 
   const addDistribution = async (

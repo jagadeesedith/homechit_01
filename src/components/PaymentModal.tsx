@@ -32,7 +32,7 @@ export function PaymentModal({ memberId, month, year, onClose }: PaymentModalPro
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!principalPaid || isNaN(parseFloat(principalPaid))) return;
+    if (principalPaid.trim() === "" || isNaN(parseFloat(principalPaid))) return;
     await recordPayment(memberId, month, year, principalNum);
     onClose();
   };
@@ -158,7 +158,7 @@ export function PaymentModal({ memberId, month, year, onClose }: PaymentModalPro
                 </button>
                 <button
                   type="submit"
-                  disabled={!principalPaid || isNaN(parseFloat(principalPaid))}
+                  disabled={principalPaid.trim() === "" || isNaN(parseFloat(principalPaid))}
                   className="flex-1 px-4 py-2.5 rounded-lg bg-[#004b87] text-white text-sm font-medium hover:bg-[#003a6b] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Confirm Payment
