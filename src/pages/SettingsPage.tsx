@@ -168,13 +168,14 @@ export function SettingsPage() {
 
     try {
       await emailjs.send(
-        'service_f8glpju',
-        'template_ow7pvnm',
-        {
-          otp: expectedOtp,
-        },
-        'Q977OTAOQ0YB8_Mbh',
-      );
+  'service_f8glpju',
+  'template_ow7pvnm',
+  {
+    otp: expectedOtp,
+    to_email: email,
+  },
+  'Q977OTAOQ0YB8_Mbh',
+);
 
       // move to verify step (only after email send succeeds)
       setReset((prev) => ({
