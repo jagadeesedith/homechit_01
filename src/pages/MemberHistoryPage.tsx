@@ -13,6 +13,8 @@ import {
   FileText,
   Users,
   Calendar,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 
@@ -20,9 +22,67 @@ export function MemberHistoryPage() {
   const { state, getMemberPayments, reloadFromFirestore } = useChitFund();
   const [selectedMemberId, setSelectedMemberId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
   const member = state.members.find((m) => m.id === selectedMemberId);
   const payments = selectedMemberId ? getMemberPayments(selectedMemberId) : [];
+
+  const sortedMembers = [...state.members].sort(
+    (a, b) => parseInt(a.id) - parseInt(b.id),
+  );
+
+  const currentMemberIndex = sortedMembers.findIndex(
+    (m) => m.id === selectedMemberId,
+  );
+
+  const goToPreviousMember = () => {
+    if (currentMemberIndex > 0) {
+      const prevMember = sortedMembers[currentMemberIndex - 1];
+
+      setSelectedMemberId(prevMember.id);
+      setSearchQuery("");
+    }
+  };
+
+  const goToNextMember = () => {
+    if (currentMemberIndex < sortedMembers.length - 1) {
+      const nextMember = sortedMembers[currentMemberIndex + 1];
+
+      setSelectedMemberId(nextMember.id);
+      setSearchQuery("");
+    }
+  };
+
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+
+    const distance = touchStart - touchEnd;
+
+    const isLeftSwipe = distance > minSwipeDistance;
+
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+      goToNextMember();
+    }
+
+    if (isRightSwipe) {
+      goToPreviousMember();
+    }
+  };
 
   const importHistory = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
@@ -88,51 +148,37 @@ export function MemberHistoryPage() {
           const paymentId = `${year}-${month}-${memberId}`;
 
           await setDoc(
-  doc(db, "users", userId, "payments", paymentId),
-  {
-    id: paymentId,
-    memberId,
-    month,
-    year,
+            doc(db, "users", userId, "payments", paymentId),
+            {
+              id: paymentId,
+              memberId,
+              month,
+              year,
 
-    previousBalance: isNaN(
-      Number(row.PreviousBalance),
-    )
-      ? 0
-      : Number(row.PreviousBalance),
+              previousBalance: isNaN(Number(row.PreviousBalance))
+                ? 0
+                : Number(row.PreviousBalance),
 
-    contribution: Number(
-      row.distribution || 0,
-    ),
+              contribution: Number(row.distribution || 0),
 
-    principalPaid: isNaN(
-      Number(row.PrincipalPaid),
-    )
-      ? 0
-      : Number(row.PrincipalPaid),
+              principalPaid: isNaN(Number(row.PrincipalPaid))
+                ? 0
+                : Number(row.PrincipalPaid),
 
-    interest: isNaN(
-      Number(row.Interest),
-    )
-      ? 0
-      : Number(row.Interest),
+              interest: isNaN(Number(row.Interest)) ? 0 : Number(row.Interest),
 
-    totalPaid: isNaN(
-      Number(row.TotalPaid),
-    )
-      ? 0
-      : Number(row.TotalPaid),
+              totalPaid: isNaN(Number(row.TotalPaid))
+                ? 0
+                : Number(row.TotalPaid),
 
-    newBalance: isNaN(
-      Number(row.NewBalance),
-    )
-      ? 0
-      : Number(row.NewBalance),
+              newBalance: isNaN(Number(row.NewBalance))
+                ? 0
+                : Number(row.NewBalance),
 
-    paidAt: new Date().toISOString(),
-  },
-  { merge: true },
-);
+              paidAt: new Date().toISOString(),
+            },
+            { merge: true },
+          );
         }
       }
 
@@ -217,7 +263,6 @@ export function MemberHistoryPage() {
               className="w-full pl-12 pr-4 py-4 text-gray-900 placeholder-gray-400 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all duration-200 text-sm font-medium"
             />
           </div>
-
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-lg mt-6">
@@ -266,19 +311,41 @@ export function MemberHistoryPage() {
         </div>
       </div>
 
-
       {member && (
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Left Panel - Member Info & Stats */}
           <div className="xl:col-span-1 space-y-6">
             {/* Member Profile Card */}
-            <div className="bg-gradient-to-br from-teal-500 to-cyan-600 rounded-2xl p-6 shadow-xl text-white">
+            <div
+              className="bg-gradient-to-br from-teal-500 to-cyan-600 rounded-2xl p-6 shadow-xl text-white"
+              onTouchStart={onTouchStart}
+              onTouchMove={onTouchMove}
+              onTouchEnd={onTouchEnd}
+            >
               <div className="flex items-center gap-4 mb-4">
                 <div className="w-16 h-16 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
                   <User className="w-8 h-8 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold">{member.name}</h3>
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={goToPreviousMember}
+                      className="bg-white/20 p-2 rounded-lg hover:bg-white/30 transition"
+                    >
+                      <ChevronLeft className="w-5 h-5 text-white" />
+                    </button>
+
+                    <div className="text-center flex-1">
+                      <h3 className="text-xl font-bold">{member.name}</h3>
+                    </div>
+
+                    <button
+                      onClick={goToNextMember}
+                      className="bg-white/20 p-2 rounded-lg hover:bg-white/30 transition"
+                    >
+                      <ChevronRight className="w-5 h-5 text-white" />
+                    </button>
+                  </div>
                   <p className="text-teal-100 text-sm font-medium">
                     ID: {member.id}
                   </p>
