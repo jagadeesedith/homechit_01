@@ -30,6 +30,8 @@ const latestPayment = [...memberPayments].sort((a, b) => {
   return b.month - a.month;
 })[0];
 
+
+
 const lastBalance =
   latestPayment?.newBalance ?? member?.balance ?? 0;
 
@@ -50,64 +52,68 @@ const lastBalance =
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
       <div
-        className="bg-gradient-to-br from-white to-blue-50 w-full max-w-[520px] mx-4 rounded-3xl shadow-2xl border border-blue-100 p-7 animate-in fade-in zoom-in-95 duration-200"
+        className="bg-gradient-to-br from-white via-cyan-50/35 to-blue-50 w-full max-w-[520px] mx-4 rounded-3xl shadow-2xl border border-cyan-100 p-5 sm:p-5 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-2xl font-bold text-slate-800">
-              💰 Collect Payment
-            </h3>
-            <p className="text-sm text-slate-500 mt-1">
-              {member.id} • {member.name}
-            </p>
+        {/* Simple premium layout */}
+        <div className="space-y-3">
+          {/* Header row */}
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-lg font-semibold text-slate-900/90">💰 Collect Payment</p>
+
+            <button
+              onClick={onClose}
+              className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center border border-white/10"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5 text-slate-600" />
+            </button>
           </div>
 
-          <button
-            onClick={onClose}
-            className="w-10 h-10 rounded-full bg-red-50 hover:bg-red-100 flex items-center justify-center transition"
-          >
-            <X className="w-5 h-5 text-red-500" />
-          </button>
-        </div>
+          {/* Member name centered */}
+          <div className="bg-gradient-to-r from-cyan-500 to-blue-500 rounded-2xl p-5 mt-1 shadow-lg border border-cyan-300 text-center">
+  <h2 className="text-2xl sm:text-3xl font-black text-white">
+    {member.name}
+  </h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
-          <div className="bg-blue-100 rounded-2xl p-4">
-            <p className="text-xs text-blue-700 font-medium">Monthly Contribution</p>
-            <p className="text-2xl font-bold text-blue-900 mt-1">{formatINR(contribution)}</p>
+  <p className="text-sm font-semibold text-cyan-100 mt-1">
+    ID: {member.id}
+  </p>
+</div>
+
+          {/* Last Month Balance card (full width) */}
+          <div className="bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl p-5 text-white shadow-lg">
+            <p className="text-sm font-medium text-emerald-100">Last Month Balance</p>
+            <h2 className="text-3xl font-black mt-1">{formatINR(lastBalance)}</h2>
           </div>
 
-          <div className="bg-orange-100 rounded-2xl p-4">
-            <p className="text-xs text-orange-700 font-medium">Interest</p>
-            <p className="text-2xl font-bold text-orange-900 mt-1">{formatINR(interest)}</p>
-          </div>
-        </div>
+          {/* 3 compact cards row */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-xl bg-gradient-to-b from-blue-50 to-white border border-blue-100 p-3">
+              <p className="text-[11px] font-semibold text-blue-700">Monthly</p>
+              <p className="text-lg font-black text-blue-900 mt-1">{formatINR(contribution)}</p>
+            </div>
 
-        <div className="space-y-4">
+            <div className="rounded-xl bg-gradient-to-b from-orange-50 to-white border border-orange-100 p-3">
+              <p className="text-[11px] font-semibold text-orange-700">Interest</p>
+              <p className="text-lg font-black text-orange-900 mt-1">{formatINR(interest)}</p>
+            </div>
 
-          <div>
-            <label className="text-xs text-[#6c757d] font-medium uppercase tracking-wider">Member Name</label>
-            <p className="text-sm text-[#1d1d1d] font-medium mt-1">{member.name}</p>
-          </div>
-
-          <div>
-            <label className="text-xs text-[#6c757d] font-medium uppercase tracking-wider">Last Month Balance</label>
-            <p className="text-sm text-[#1d1d1d] font-medium mt-1">{formatINR(lastBalance)}</p>
-          </div>
-
-          <div>
-            <label className="text-xs text-[#6c757d] font-medium uppercase tracking-wider">Monthly Contribution</label>
-            <p className="text-sm text-[#1d1d1d] font-medium mt-1">
-              {formatINR(contribution)} {isFirstMonth && <span className="text-xs text-[#28a745]">(First Month)</span>}
-            </p>
+            <div className="rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 border border-emerald-200 p-3 text-white shadow-sm">
+              <p className="text-[11px] font-semibold text-emerald-50">Total</p>
+              <p className="text-lg font-black text-white mt-1">{formatINR(totalToCollect)}</p>
+            </div>
           </div>
 
+          {/* Form area */}
           {!isAlreadyPaid && (
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} className="pb-4">
+              {/* Principal Paid input */}
               <div>
-                <label className="text-xs text-[#6c757d] font-medium uppercase tracking-wider">
-                  Principal Paid (Manual Entry)
+                <label className="text-xs font-semibold text-cyan-700 uppercase tracking-wider">
+                  💸 Principal Paid
                 </label>
+
                 <input
                   type="number"
                   min="0"
@@ -115,74 +121,71 @@ const lastBalance =
                   value={principalPaid}
                   onChange={(e) => setPrincipalPaid(e.target.value)}
                   placeholder="Enter amount"
-                  className="mt-1 w-full text-sm rounded border border-[#e9ecef] p-2.5 focus:outline-none focus:ring-2 focus:ring-[#004b87] focus:border-transparent"
+                  className="mt-2 w-full text-lg sm:text-xl rounded-2xl border border-slate-200 p-5 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/60 focus:border-transparent"
                   autoFocus
                 />
+
+                {/* Quick amount buttons */}
                 <div className="flex flex-wrap gap-2 mt-3">
-  {[0, 1000, 2000, 5000].map((amount) => (
-    <button
-      key={amount}
-      type="button"
-      onClick={() => setPrincipalPaid(String(amount))}
-      className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all
-        ${
-          principalPaid === String(amount)
-            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
-            : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
-        }`}
-    >
-      ₹{amount}
-    </button>
-  ))}
+                  {[0, 1000, 2000, 5000].map((amount) => (
+                    <button
+                      key={amount}
+                      type="button"
+                      onClick={() => setPrincipalPaid(String(amount))}
+                      className={`px-4 py-2 rounded-full text-sm font-semibold transition-all border shadow-sm
+                        ${
+                          principalPaid === String(amount)
+                            ? 'bg-gradient-to-r from-cyan-600 to-teal-500 text-white border-teal-200'
+                            : 'bg-cyan-50 text-cyan-800 border-cyan-100 hover:bg-cyan-100'
+                        }`}
+                    >
+                      ₹{amount}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* New Balance full-width card */}
+              <div className="bg-gradient-to-r from-amber-50 to-yellow-100 rounded-2xl border border-yellow-300 p-4 mt-4">
+  <p className="text-sm font-semibold text-amber-700">
+    💰 New Balance
+  </p>
+
+  <h2 className="text-3xl font-black text-amber-700 mt-1">
+    {formatINR(newBalance)}
+  </h2>
 </div>
-              </div>
 
-              <div className="mt-4">
-                <label className="text-xs text-[#6c757d] font-medium uppercase tracking-wider">Interest (Auto)</label>
-                <p className="text-sm text-[#1d1d1d] font-medium mt-1">{formatINR(interest)}</p>
-                <p className="text-xs text-[#6c757d]">2% of Last Month Balance</p>
-              </div>
-
-              <div className="border-t border-[#e9ecef] my-4" />
-
-              <div>
-                <label className="text-xs text-[#6c757d] font-medium uppercase tracking-wider">Total to Collect</label>
-                <p className="text-lg font-bold text-[#004b87] mt-1">{formatINR(totalToCollect)}</p>
-                <p className="text-xs text-[#6c757d]">{formatINR(contribution)} + {formatINR(principalNum)} + {formatINR(interest)}</p>
-              </div>
-
-              <div className="mt-3">
-                <label className="text-xs text-[#6c757d] font-medium uppercase tracking-wider">New Balance</label>
-                <p className="text-sm font-semibold text-[#1d1d1d] mt-1">{formatINR(newBalance)}</p>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex-1 px-4 py-2.5 rounded-lg border border-[#e9ecef] text-sm text-[#6c757d] hover:bg-[#f8f9fa] transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={principalPaid.trim() === "" || isNaN(parseFloat(principalPaid))}
-                  className="flex-1 px-4 py-2.5 rounded-lg bg-[#004b87] text-white text-sm font-medium hover:bg-[#003a6b] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Confirm Payment
-                </button>
+              {/* Sticky buttons */}
+              <div className="sticky bottom-0 z-20 mt-4 pt-3">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="flex-1 px-4 py-3 rounded-xl bg-slate-100 border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={principalPaid.trim() === "" || isNaN(parseFloat(principalPaid))}
+                    className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-teal-500 text-white text-sm font-bold shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Confirm Payment
+                  </button>
+                </div>
               </div>
             </form>
           )}
 
           {isAlreadyPaid && (
-            <div className="mt-4">
-              <div className="bg-[#d1f2d9] border border-[#28a745] rounded-lg p-4 text-center">
-                <p className="text-sm font-medium text-[#28a745]">Payment already recorded for this month</p>
+            <div className="pb-6">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 text-center">
+                <p className="text-sm font-semibold text-emerald-700">Payment already recorded for this month</p>
               </div>
               <button
                 onClick={onClose}
-                className="w-full mt-4 px-4 py-2.5 rounded-lg border border-[#e9ecef] text-sm text-[#6c757d] hover:bg-[#f8f9fa] transition-colors"
+                className="w-full mt-4 px-4 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
               >
                 Close
               </button>
