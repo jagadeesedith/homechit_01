@@ -51,8 +51,16 @@ const navItems = [
 
 export function Sidebar() {
   const location = useLocation();
-  const { logout } = useAuth();
+  const { logout , user} = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+
+  const name =
+    user?.displayName ||
+    "Adiministrator";
+
+  const email =
+    user?.email ||
+    "No Email";
 
   return (
     <>
@@ -66,8 +74,8 @@ export function Sidebar() {
               <User className="w-6 h-6 text-white" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-semibold text-white">Administrator</p>
-              <p className="text-xs text-blue-300">admin@chitfund.com</p>
+              <p className="text-sm font-semibold text-white">{name}</p>
+              <p className="text-xs text-blue-300">{email}</p>
             </div>
             <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
               <ChevronDown className="w-4 h-4 text-white/60" />
@@ -204,8 +212,8 @@ export function Sidebar() {
                 <User className="w-5 h-5 text-white" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-white">Administrator</p>
-                <p className="text-xs text-blue-300">admin@chitfund.com</p>
+                <p className="text-sm font-semibold text-white">{name}</p>
+                <p className="text-xs text-blue-300">{email}</p>
               </div>
             </div>
             <button
