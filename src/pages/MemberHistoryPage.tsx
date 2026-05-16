@@ -24,125 +24,112 @@ export function MemberHistoryPage() {
   const member = state.members.find((m) => m.id === selectedMemberId);
   const payments = selectedMemberId ? getMemberPayments(selectedMemberId) : [];
 
-  const importHistory = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    try {
-      const file = e.target.files?.[0];
-      if (!file) {
-        alert("No file selected");
-        return;
-      }
+  const importHistory = async (
+  e: React.ChangeEvent<HTMLInputElement>,
+) => {
+  try {
+    alert("Import Started");
 
-      const user = auth.currentUser;
-      if (!user) {
-        alert("User not logged in");
-        return;
-      }
+    const file = e.target.files?.[0];
 
-      const userId = user.uid;
-
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data);
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-
-      const rows = XLSX.utils.sheet_to_json(sheet);
-      console.log(rows);
-
-      const parseMonthField = (value: unknown) => {
-        if (value === null || value === undefined) return null;
-
-        // Excel can give:
-        // 1) String date: 2025-01-20
-        // 2) Serial number: 45677
-        // We must convert both into { year, month }.
-
-        // If it is already a number (serial)
-        if (typeof value === "number" && Number.isFinite(value)) {
-          const parsed = XLSX.SSF.parse_date_code(value);
-          if (!parsed || !Number.isFinite(parsed.y) || !Number.isFinite(parsed.m)) return null;
-          return { year: parsed.y, month: parsed.m };
-        }
-
-        const raw = String(value).trim();
-        if (!raw) return null;
-
-        // 1) String format: YYYY-MM-DD
-        const match = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-        if (match) {
-          const year = Number(match[1]);
-          const month = Number(match[2]);
-          if (!Number.isFinite(year) || !Number.isFinite(month)) return null;
-          return { year, month };
-        }
-
-        // 2) Serial as string
-        const serial = Number(raw);
-        if (Number.isFinite(serial)) {
-          const parsed = XLSX.SSF.parse_date_code(serial);
-          if (!parsed || !Number.isFinite(parsed.y) || !Number.isFinite(parsed.m)) return null;
-          return { year: parsed.y, month: parsed.m };
-        }
-
-        // Fallback: try Date parsing (if possible)
-        const d = new Date(raw);
-        if (Number.isNaN(d.getTime())) return null;
-        return { year: d.getFullYear(), month: d.getMonth() + 1 };
-      };
-
-      const toNumber = (value: unknown) => {
-        if (value === null || value === undefined) return 0;
-        const n =
-          typeof value === "number" ? value : Number(String(value).trim());
-        return Number.isFinite(n) ? n : 0;
-      };
-
-      let importedCount = 0;
-
-      for (const row of rows as Record<string, unknown>[]) {
-        // Required Excel keys:
-        // memberID, Month, PreviousBalance, PrincipalPaid, Interest, TotalPaid, NewBalance
-        const memberId = String(row.memberID ?? "").trim();
-        if (!memberId) continue;
-
-        const parsed = parseMonthField(row.Month);
-        if (!parsed) continue;
-
-        const { year, month } = parsed;
-        if (!Number.isFinite(year) || !Number.isFinite(month)) continue;
-        if (month < 1 || month > 12) continue;
-
-        const paymentId = `${year}-${month}-${memberId}`;
-
-        await setDoc(
-          doc(db, "users", userId, "payments", paymentId),
-          {
-            memberId,
-            month,
-            year,
-            previousBalance: toNumber(row.PreviousBalance),
-            contribution: 0,
-            principalPaid: toNumber(row.PrincipalPaid),
-            interest: toNumber(row.Interest),
-            totalPaid: toNumber(row.TotalPaid),
-            newBalance: toNumber(row.NewBalance),
-            paidAt: new Date().toISOString(),
-          },
-          { merge: true },
-        );
-
-        importedCount++;
-      }
-
-      e.target.value = "";
-      await reloadFromFirestore();
-      alert("History Imported Successfully ✅");
-
-      console.log({ importedCount });
-    } catch (error) {
-      console.error("History import failed:", error);
-      const message = error instanceof Error ? error.message : String(error);
-      alert("Error: " + message);
+    if (!file) {
+      alert("No file selected");
+      return;
     }
-  };
+
+    const user = auth.currentUser;
+
+    if (!user) {
+      alert("User not logged in");
+      return;
+    }
+
+    const userId = user.uid;
+
+    const data = await file.arrayBuffer();
+
+    const workbook = XLSX.read(data);
+
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+    const rows = XLSX.utils.sheet_to_json(sheet);
+
+    console.log(rows);
+
+    const parseMonthField = (monthValue: unknown) => {
+      let month = 0;
+      let year = 0;
+
+      // Excel serial date (45677)
+      if (typeof monthValue === "number") {
+        const parsedDate = XLSX.SSF.parse_date_code(monthValue);
+
+        if (parsedDate) {
+          month = parsedDate.m;
+          year = parsedDate.y;
+        }
+      }
+
+      // String date (2025-01-20)
+      else if (typeof monthValue === "string") {
+        const date = new Date(monthValue);
+
+        if (!isNaN(date.getTime())) {
+          month = date.getMonth() + 1;
+          year = date.getFullYear();
+        }
+      }
+
+      return { month, year };
+    };
+
+    for (const row of rows as Record<string, unknown>[]) {
+      const memberId = String(row.memberID || "").trim();
+
+      if (!memberId) continue;
+
+      const { month, year } = parseMonthField(row.Month);
+
+      if (!month || !year) {
+        console.warn("Invalid month:", row.Month);
+        continue;
+      }
+
+      const paymentId = `${year}-${month}-${memberId}`;
+
+      await setDoc(
+        doc(db, "users", userId, "payments", paymentId),
+        {
+          id: paymentId,
+          memberId,
+          month,
+          year,
+          previousBalance: Number(row.PreviousBalance || 0),
+          contribution: 0,
+          principalPaid: Number(row.PrincipalPaid || 0),
+          interest: Number(row.Interest || 0),
+          totalPaid: Number(row.TotalPaid || 0),
+          newBalance: Number(row.NewBalance || 0),
+          paidAt: new Date().toISOString(),
+        },
+        { merge: true },
+      );
+    }
+
+    alert("History Imported Successfully ✅");
+
+    e.target.value = "";
+
+    await reloadFromFirestore();
+  } catch (error) {
+    console.error(error);
+
+    const message =
+      error instanceof Error ? error.message : String(error);
+
+    alert("Import Error: " + message);
+  }
+};
 
   const totalPaidToDate = payments.reduce((s, p) => s + p.totalPaid, 0);
   const monthsActive = payments.length;
