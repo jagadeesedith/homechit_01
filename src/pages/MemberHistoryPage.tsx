@@ -26,8 +26,6 @@ export function MemberHistoryPage() {
 
   const importHistory = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
-      alert("Import Started");
-
       const file = e.target.files?.[0];
       if (!file) {
         alert("No file selected");
@@ -35,7 +33,6 @@ export function MemberHistoryPage() {
       }
 
       const user = auth.currentUser;
-
       if (!user) {
         alert("User not logged in");
         return;
@@ -44,62 +41,84 @@ export function MemberHistoryPage() {
       const userId = user.uid;
 
       const data = await file.arrayBuffer();
-
       const workbook = XLSX.read(data);
-
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
 
       const rows = XLSX.utils.sheet_to_json(sheet);
-
       console.log(rows);
-      alert(`Rows Found: ${(rows as unknown[]).length}`);
+
+      const parseMonthField = (value: unknown) => {
+        if (value === null || value === undefined) return null;
+
+        const raw = String(value).trim();
+        if (!raw) return null;
+
+        // Expected: 2025-01-20
+        const match = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+        if (match) {
+          const year = Number(match[1]);
+          const month = Number(match[2]);
+          if (!Number.isFinite(year) || !Number.isFinite(month)) return null;
+          return { year, month };
+        }
+
+        // Fallback: try Date parsing (Excel sometimes gives other formats)
+        const d = new Date(raw);
+        if (Number.isNaN(d.getTime())) return null;
+        return { year: d.getFullYear(), month: d.getMonth() + 1 };
+      };
+
+      const toNumber = (value: unknown) => {
+        if (value === null || value === undefined) return 0;
+        const n =
+          typeof value === "number" ? value : Number(String(value).trim());
+        return Number.isFinite(n) ? n : 0;
+      };
+
+      let importedCount = 0;
 
       for (const row of rows as Record<string, unknown>[]) {
-        const memberId = String(row.MemberID || "");
-
+        // Required Excel keys:
+        // memberID, Month, PreviousBalance, PrincipalPaid, Interest, TotalPaid, NewBalance
+        const memberId = String(row.memberID ?? "").trim();
         if (!memberId) continue;
 
-        await setDoc(
-          doc(db, "users", userId, "members", memberId),
-          {
-            id: memberId,
-            name: String(row.Name || ""),
-            phone: String(row.Phone || ""),
-            joinDate: new Date().toISOString(),
-            balance: Number(row.NewBalance || 0),
-            active: true,
-          },
-          { merge: true },
-        );
+        const parsed = parseMonthField(row.Month);
+        if (!parsed) continue;
 
-        const month = Number(row.Month || 0);
-        const year = Number(row.Year || 0);
-        const paymentId = `${year}-${String(month).padStart(2, "0")}-${memberId}`;
+        const { year, month } = parsed;
+        if (!Number.isFinite(year) || !Number.isFinite(month)) continue;
+        if (month < 1 || month > 12) continue;
+
+        const paymentId = `${year}-${month}-${memberId}`;
 
         await setDoc(
           doc(db, "users", userId, "payments", paymentId),
           {
-            id: paymentId,
             memberId,
             month,
             year,
-            previousBalance: Number(row.PreviousBalance || 0),
-            contribution: Number(row.ChitAmount || 0),
-            principalPaid: Number(row.PrincipalPaid || 0),
-            interest: Number(row.Interest || 0),
-            totalPaid: Number(row.TotalPaid || 0),
-            newBalance: Number(row.NewBalance || 0),
+            previousBalance: toNumber(row.PreviousBalance),
+            contribution: 0,
+            principalPaid: toNumber(row.PrincipalPaid),
+            interest: toNumber(row.Interest),
+            totalPaid: toNumber(row.TotalPaid),
+            newBalance: toNumber(row.NewBalance),
             paidAt: new Date().toISOString(),
           },
           { merge: true },
         );
+
+        importedCount++;
       }
 
-      alert("Import Success ✅");
       e.target.value = "";
       await reloadFromFirestore();
+      alert("History Imported Successfully ✅");
+
+      console.log({ importedCount });
     } catch (error) {
-      console.error(error);
+      console.error("History import failed:", error);
       const message = error instanceof Error ? error.message : String(error);
       alert("Error: " + message);
     }
