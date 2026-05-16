@@ -30,9 +30,9 @@ export function MemberHistoryPage() {
   try {
     alert("Import Started");
 
-    const file = e.target.files?.[0];
+    const files = e.target.files;
 
-    if (!file) {
+    if (!files || files.length === 0) {
       alert("No file selected");
       return;
     }
@@ -46,21 +46,10 @@ export function MemberHistoryPage() {
 
     const userId = user.uid;
 
-    const data = await file.arrayBuffer();
-
-    const workbook = XLSX.read(data);
-
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-
-    const rows = XLSX.utils.sheet_to_json(sheet);
-
-    console.log(rows);
-
     const parseMonthField = (monthValue: unknown) => {
       let month = 0;
       let year = 0;
 
-      // Excel serial date (45677)
       if (typeof monthValue === "number") {
         const parsedDate = XLSX.SSF.parse_date_code(monthValue);
 
@@ -68,10 +57,7 @@ export function MemberHistoryPage() {
           month = parsedDate.m;
           year = parsedDate.y;
         }
-      }
-
-      // String date (2025-01-20)
-      else if (typeof monthValue === "string") {
+      } else if (typeof monthValue === "string") {
         const date = new Date(monthValue);
 
         if (!isNaN(date.getTime())) {
@@ -83,40 +69,83 @@ export function MemberHistoryPage() {
       return { month, year };
     };
 
-    for (const row of rows as Record<string, unknown>[]) {
-      const memberId = String(row.memberID || "").trim();
+    // Loop through all selected files
+    for (const file of Array.from(files)) {
+      console.log("Importing:", file.name);
 
-      if (!memberId) continue;
+      const data = await file.arrayBuffer();
 
-      const { month, year } = parseMonthField(row.Month);
+      const workbook = XLSX.read(data);
 
-      if (!month || !year) {
-        console.warn("Invalid month:", row.Month);
-        continue;
+      const sheet =
+        workbook.Sheets[workbook.SheetNames[0]];
+
+      const rows = XLSX.utils.sheet_to_json(sheet);
+
+      // Loop rows inside each file
+      for (const row of rows as Record<
+        string,
+        unknown
+      >[]) {
+        const memberId = String(
+          row.memberID || "",
+        ).trim();
+
+        if (!memberId) continue;
+
+        const { month, year } =
+          parseMonthField(row.Month);
+
+        if (!month || !year) {
+          console.warn(
+            "Invalid month:",
+            row.Month,
+          );
+          continue;
+        }
+
+        const paymentId = `${year}-${month}-${memberId}`;
+
+        await setDoc(
+          doc(
+            db,
+            "users",
+            userId,
+            "payments",
+            paymentId,
+          ),
+          {
+            id: paymentId,
+            memberId,
+            month,
+            year,
+            previousBalance: Number(
+              row.PreviousBalance || 0,
+            ),
+            contribution: 0,
+            principalPaid: Number(
+              row.PrincipalPaid || 0,
+            ),
+            interest: Number(
+              row.Interest || 0,
+            ),
+            totalPaid: Number(
+              row.TotalPaid || 0,
+            ),
+            newBalance: Number(
+              row.NewBalance || 0,
+            ),
+            paidAt:
+              new Date().toISOString(),
+          },
+          { merge: true },
+        );
       }
-
-      const paymentId = `${year}-${month}-${memberId}`;
-
-      await setDoc(
-        doc(db, "users", userId, "payments", paymentId),
-        {
-          id: paymentId,
-          memberId,
-          month,
-          year,
-          previousBalance: Number(row.PreviousBalance || 0),
-          contribution: 0,
-          principalPaid: Number(row.PrincipalPaid || 0),
-          interest: Number(row.Interest || 0),
-          totalPaid: Number(row.TotalPaid || 0),
-          newBalance: Number(row.NewBalance || 0),
-          paidAt: new Date().toISOString(),
-        },
-        { merge: true },
-      );
     }
 
-    alert("History Imported Successfully ✅");
+    alert(
+      "All Excel Files Imported Successfully ✅",
+    );
 
     e.target.value = "";
 
@@ -125,7 +154,9 @@ export function MemberHistoryPage() {
     console.error(error);
 
     const message =
-      error instanceof Error ? error.message : String(error);
+      error instanceof Error
+        ? error.message
+        : String(error);
 
     alert("Import Error: " + message);
   }
