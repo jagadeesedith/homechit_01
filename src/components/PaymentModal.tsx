@@ -11,8 +11,8 @@ interface PaymentModalProps {
 }
 
 export function PaymentModal({ memberId, month, year, onClose }: PaymentModalProps) {
-  const { state, recordPayment, hasMemberPaid } = useChitFund();
-  const [principalPaid, setPrincipalPaid] = useState('');
+  const { state, recordPayment, hasMemberPaid, getMemberPayments } = useChitFund();
+  const [principalPaid, setPrincipalPaid] = useState('0');
 
   const member = state.members.find(m => m.id === memberId);
   const isAlreadyPaid = hasMemberPaid(memberId, month, year);
@@ -23,7 +23,15 @@ export function PaymentModal({ memberId, month, year, onClose }: PaymentModalPro
     ? state.settings.firstMonthAmount
     : state.settings.monthlyAmount;
 
-  const lastBalance = member?.balance ?? 0;
+  const memberPayments = getMemberPayments(memberId);
+
+const latestPayment = [...memberPayments].sort((a, b) => {
+  if (a.year !== b.year) return b.year - a.year;
+  return b.month - a.month;
+})[0];
+
+const lastBalance =
+  latestPayment?.newBalance ?? member?.balance ?? 0;
 
   const principalNum = parseFloat(principalPaid) || 0;
   const interest = (lastBalance * state.settings.interestRate) / 100;
