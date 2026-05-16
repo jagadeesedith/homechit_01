@@ -50,10 +50,22 @@ export function MemberHistoryPage() {
       const parseMonthField = (value: unknown) => {
         if (value === null || value === undefined) return null;
 
+        // Excel can give:
+        // 1) String date: 2025-01-20
+        // 2) Serial number: 45677
+        // We must convert both into { year, month }.
+
+        // If it is already a number (serial)
+        if (typeof value === "number" && Number.isFinite(value)) {
+          const parsed = XLSX.SSF.parse_date_code(value);
+          if (!parsed || !Number.isFinite(parsed.y) || !Number.isFinite(parsed.m)) return null;
+          return { year: parsed.y, month: parsed.m };
+        }
+
         const raw = String(value).trim();
         if (!raw) return null;
 
-        // Expected: 2025-01-20
+        // 1) String format: YYYY-MM-DD
         const match = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
         if (match) {
           const year = Number(match[1]);
@@ -62,7 +74,15 @@ export function MemberHistoryPage() {
           return { year, month };
         }
 
-        // Fallback: try Date parsing (Excel sometimes gives other formats)
+        // 2) Serial as string
+        const serial = Number(raw);
+        if (Number.isFinite(serial)) {
+          const parsed = XLSX.SSF.parse_date_code(serial);
+          if (!parsed || !Number.isFinite(parsed.y) || !Number.isFinite(parsed.m)) return null;
+          return { year: parsed.y, month: parsed.m };
+        }
+
+        // Fallback: try Date parsing (if possible)
         const d = new Date(raw);
         if (Number.isNaN(d.getTime())) return null;
         return { year: d.getFullYear(), month: d.getMonth() + 1 };
