@@ -24,143 +24,102 @@ export function MemberHistoryPage() {
   const member = state.members.find((m) => m.id === selectedMemberId);
   const payments = selectedMemberId ? getMemberPayments(selectedMemberId) : [];
 
-  const importHistory = async (
-  e: React.ChangeEvent<HTMLInputElement>,
-) => {
-  try {
-    alert("Import Started");
+  const importHistory = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      alert("Import Started");
 
-    const files = e.target.files;
+      const files = Array.from(e.target.files || []);
 
-    if (!files || files.length === 0) {
-      alert("No file selected");
-      return;
-    }
-
-    const user = auth.currentUser;
-
-    if (!user) {
-      alert("User not logged in");
-      return;
-    }
-
-    const userId = user.uid;
-
-    const parseMonthField = (monthValue: unknown) => {
-      let month = 0;
-      let year = 0;
-
-      if (typeof monthValue === "number") {
-        const parsedDate = XLSX.SSF.parse_date_code(monthValue);
-
-        if (parsedDate) {
-          month = parsedDate.m;
-          year = parsedDate.y;
-        }
-      } else if (typeof monthValue === "string") {
-        const date = new Date(monthValue);
-
-        if (!isNaN(date.getTime())) {
-          month = date.getMonth() + 1;
-          year = date.getFullYear();
-        }
+      if (!files || files.length === 0) {
+        alert("No file selected");
+        return;
       }
 
-      return { month, year };
-    };
+      const user = auth.currentUser;
 
-    // Loop through all selected files
-    for (const file of Array.from(files)) {
-      console.log("Importing:", file.name);
+      if (!user) {
+        alert("User not logged in");
+        return;
+      }
 
-      const data = await file.arrayBuffer();
+      const userId = user.uid;
 
-      const workbook = XLSX.read(data);
+      const parseMonthField = (monthValue: unknown) => {
+        let month = 0;
+        let year = 0;
 
-      const sheet =
-        workbook.Sheets[workbook.SheetNames[0]];
+        if (typeof monthValue === "number") {
+          const parsedDate = XLSX.SSF.parse_date_code(monthValue);
 
-      const rows = XLSX.utils.sheet_to_json(sheet);
+          if (parsedDate) {
+            month = parsedDate.m;
+            year = parsedDate.y;
+          }
+        } else if (typeof monthValue === "string") {
+          const date = new Date(monthValue);
 
-      // Loop rows inside each file
-      for (const row of rows as Record<
-        string,
-        unknown
-      >[]) {
-        const memberId = String(
-          row.memberID || "",
-        ).trim();
+          if (!isNaN(date.getTime())) {
+            month = date.getMonth() + 1;
+            year = date.getFullYear();
+          }
+        }
 
-        if (!memberId) continue;
+        return { month, year };
+      };
 
-        const { month, year } =
-          parseMonthField(row.Month);
+      // Loop through all selected files
+      for (const file of files) {
+        alert(`Importing ${file.name}`);
 
-        if (!month || !year) {
-          console.warn(
-            "Invalid month:",
-            row.Month,
+        const data = await file.arrayBuffer();
+        const workbook = XLSX.read(data);
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet);
+
+        for (const row of rows as Record<string, unknown>[]) {
+          const memberId = String(row.memberID || "").trim();
+
+          if (!memberId) continue;
+
+          const { month, year } = parseMonthField(row.Month);
+
+          if (!month || !year) continue;
+
+          const paymentId = `${year}-${month}-${memberId}`;
+
+          await setDoc(
+            doc(db, "users", userId, "payments", paymentId),
+            {
+              id: paymentId,
+              memberId,
+              month,
+              year,
+              previousBalance: Number(row.PreviousBalance || 0),
+              contribution: 0,
+              principalPaid: Number(row.PrincipalPaid || 0),
+              interest: Number(row.Interest || 0),
+              totalPaid: Number(row.TotalPaid || 0),
+              newBalance: Number(row.NewBalance || 0),
+              paidAt: new Date().toISOString(),
+            },
+            { merge: true },
           );
-          continue;
         }
-
-        const paymentId = `${year}-${month}-${memberId}`;
-
-        await setDoc(
-          doc(
-            db,
-            "users",
-            userId,
-            "payments",
-            paymentId,
-          ),
-          {
-            id: paymentId,
-            memberId,
-            month,
-            year,
-            previousBalance: Number(
-              row.PreviousBalance || 0,
-            ),
-            contribution: 0,
-            principalPaid: Number(
-              row.PrincipalPaid || 0,
-            ),
-            interest: Number(
-              row.Interest || 0,
-            ),
-            totalPaid: Number(
-              row.TotalPaid || 0,
-            ),
-            newBalance: Number(
-              row.NewBalance || 0,
-            ),
-            paidAt:
-              new Date().toISOString(),
-          },
-          { merge: true },
-        );
       }
+
+      alert("All Excel Files Imported Successfully ✅");
+
+      e.target.value = "";
+
+      await reloadFromFirestore();
+    } catch (error) {
+      console.error(error);
+
+      const message = error instanceof Error ? error.message : String(error);
+
+      alert("Import Error: " + message);
     }
-
-    alert(
-      "All Excel Files Imported Successfully ✅",
-    );
-
-    e.target.value = "";
-
-    await reloadFromFirestore();
-  } catch (error) {
-    console.error(error);
-
-    const message =
-      error instanceof Error
-        ? error.message
-        : String(error);
-
-    alert("Import Error: " + message);
-  }
-};
+  };
 
   const totalPaidToDate = payments.reduce((s, p) => s + p.totalPaid, 0);
   const monthsActive = payments.length;
@@ -198,7 +157,7 @@ export function MemberHistoryPage() {
             <input
               type="file"
               accept=".xlsx,.xls"
-              multiple 
+              multiple
               hidden
               onChange={importHistory}
             />
@@ -229,13 +188,15 @@ export function MemberHistoryPage() {
               className="w-full pl-12 pr-4 py-4 text-gray-900 placeholder-gray-400 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all duration-200 text-sm font-medium"
             />
           </div>
-
+          
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-lg mt-6">
           <div className="mb-4">
             <h3 className="text-lg font-bold text-gray-900">All Members</h3>
-            <p className="text-sm text-gray-600">Click member to view payment history</p>
+            <p className="text-sm text-gray-600">
+              Click member to view payment history
+            </p>
           </div>
 
           <div className="border border-gray-200 rounded-xl max-h-[400px] overflow-y-auto bg-white">
@@ -266,11 +227,9 @@ export function MemberHistoryPage() {
                   </div>
 
                   <div className="group flex items-center gap-2 bg-gradient-to-r from-teal-500 to-cyan-600 text-white px-4 py-2 rounded-2xl shadow-md hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-  <FileText className="w-4 h-4 group-hover:rotate-6 transition-transform duration-300" />
-  <span className="text-sm font-semibold">
-    View History
-  </span>
-</div>
+                    <FileText className="w-4 h-4 group-hover:rotate-6 transition-transform duration-300" />
+                    <span className="text-sm font-semibold">View History</span>
+                  </div>
                 </button>
               ))
             )}
