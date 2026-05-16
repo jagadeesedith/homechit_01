@@ -327,7 +327,7 @@ export function SettingsPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="block text-sm font-bold text-gray-900 flex items-center gap-2">
+                    <label className=" text-sm font-bold text-gray-900 flex items-center gap-2">
                       <DollarSign className="w-4 h-4 text-gray-500" />
                       First Month Amount (₹)
                     </label>
@@ -345,7 +345,7 @@ export function SettingsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-sm font-bold text-gray-900 flex items-center gap-2">
+                    <label className=" text-sm font-bold text-gray-900 flex items-center gap-2">
                       <DollarSign className="w-4 h-4 text-gray-500" />
                       Monthly Contribution (₹)
                     </label>
@@ -363,7 +363,7 @@ export function SettingsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-sm font-bold text-gray-900 flex items-center gap-2">
+                    <label className=" text-sm font-bold text-gray-900 flex items-center gap-2">
                       <Percent className="w-4 h-4 text-gray-500" />
                       Interest Rate (% )
                     </label>
@@ -383,7 +383,7 @@ export function SettingsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-sm font-bold text-gray-900 flex items-center gap-2">
+                    <label className=" text-sm font-bold text-gray-900 flex items-center gap-2">
                       <Users className="w-4 h-4 text-gray-500" />
                       Total Members
                     </label>
@@ -411,7 +411,7 @@ export function SettingsPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="space-y-2">
-                    <label className="block text-sm font-bold text-gray-900 flex items-center gap-2">
+                    <label className=" text-sm font-bold text-gray-900 flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-gray-500" />
                       Starting Month
                     </label>
@@ -436,7 +436,7 @@ export function SettingsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-sm font-bold text-gray-900 flex items-center gap-2">
+                    <label className=" text-sm font-bold text-gray-900 flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-gray-500" />
                       Starting Year
                     </label>
@@ -449,7 +449,7 @@ export function SettingsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-sm font-bold text-gray-900 flex items-center gap-2">
+                    <label className=" text-sm font-bold text-gray-900 flex items-center gap-2">
                       <Clock className="w-4 h-4 text-gray-500" />
                       Duration (Months)
                     </label>
