@@ -88,22 +88,51 @@ export function MemberHistoryPage() {
           const paymentId = `${year}-${month}-${memberId}`;
 
           await setDoc(
-            doc(db, "users", userId, "payments", paymentId),
-            {
-              id: paymentId,
-              memberId,
-              month,
-              year,
-              previousBalance: Number(row.PreviousBalance || 0),
-              contribution: 0,
-              principalPaid: Number(row.PrincipalPaid || 0),
-              interest: Number(row.Interest || 0),
-              totalPaid: Number(row.TotalPaid || 0),
-              newBalance: Number(row.NewBalance || 0),
-              paidAt: new Date().toISOString(),
-            },
-            { merge: true },
-          );
+  doc(db, "users", userId, "payments", paymentId),
+  {
+    id: paymentId,
+    memberId,
+    month,
+    year,
+
+    previousBalance: isNaN(
+      Number(row.PreviousBalance),
+    )
+      ? 0
+      : Number(row.PreviousBalance),
+
+    contribution: Number(
+      row.distribution || 0,
+    ),
+
+    principalPaid: isNaN(
+      Number(row.PrincipalPaid),
+    )
+      ? 0
+      : Number(row.PrincipalPaid),
+
+    interest: isNaN(
+      Number(row.Interest),
+    )
+      ? 0
+      : Number(row.Interest),
+
+    totalPaid: isNaN(
+      Number(row.TotalPaid),
+    )
+      ? 0
+      : Number(row.TotalPaid),
+
+    newBalance: isNaN(
+      Number(row.NewBalance),
+    )
+      ? 0
+      : Number(row.NewBalance),
+
+    paidAt: new Date().toISOString(),
+  },
+  { merge: true },
+);
         }
       }
 
@@ -188,7 +217,7 @@ export function MemberHistoryPage() {
               className="w-full pl-12 pr-4 py-4 text-gray-900 placeholder-gray-400 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all duration-200 text-sm font-medium"
             />
           </div>
-          
+
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-lg mt-6">
