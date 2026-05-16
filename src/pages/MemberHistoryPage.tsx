@@ -167,6 +167,7 @@ export function MemberHistoryPage() {
             <input
               type="file"
               accept=".xlsx,.xls"
+              multiple 
               hidden
               onChange={importHistory}
             />
