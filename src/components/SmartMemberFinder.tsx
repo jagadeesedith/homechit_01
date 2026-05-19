@@ -112,7 +112,7 @@ export function SmartMemberFinder({
   const visibleCount = filteredMembers.length;
 
   return (
-    <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+    <section className="admin-surface admin-enter mb-6 p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
@@ -125,24 +125,24 @@ export function SmartMemberFinder({
               if (event.target.value.trim()) onActiveGroupStartChange(null);
             }}
             placeholder="Search number / phone"
-            className="h-[52px] w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-12 pr-4 text-base font-semibold text-slate-900 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
+            className="admin-input h-[52px] w-full py-3 pl-12 pr-4 text-base font-semibold"
           />
         </div>
 
         <button
           type="button"
           onClick={onToggleSelectMode}
-          className={`h-[52px] rounded-xl px-5 text-sm font-bold transition ${
+          className={`admin-button admin-press h-[52px] px-5 ${
             selectMode
-              ? "bg-slate-900 text-white"
-              : "bg-blue-600 text-white hover:bg-blue-700"
+              ? "bg-slate-900 text-white shadow-[0_10px_24px_rgba(15,23,42,0.18)]"
+              : "bg-blue-600 text-white shadow-[0_10px_24px_rgba(37,99,235,0.18)] hover:bg-blue-700"
           }`}
         >
           {selectMode ? "Exit Select" : "Select Mode"}
         </button>
       </div>
 
-      <div className="mt-4 flex rounded-xl bg-slate-100 p-1">
+      <div className="mt-4 flex rounded-xl bg-slate-100 p-1 shadow-inner shadow-slate-200/60">
         {(["groups", "all"] as FinderMode[]).map((item) => (
           <button
             key={item}
@@ -151,10 +151,10 @@ export function SmartMemberFinder({
               onModeChange(item);
               onActiveGroupStartChange(null);
             }}
-            className={`h-11 flex-1 rounded-lg text-sm font-bold transition ${
+            className={`admin-press admin-transition h-11 flex-1 rounded-lg text-sm font-bold transition-[transform,background-color,box-shadow,color] ${
               mode === item
                 ? "bg-white text-slate-950 shadow-sm"
-                : "text-slate-600"
+                : "text-slate-600 hover:text-slate-900"
             }`}
           >
             {item === "groups" ? "Groups" : "All"}
@@ -169,10 +169,10 @@ export function SmartMemberFinder({
               key={group.start}
               type="button"
               onClick={() => onActiveGroupStartChange(group.start)}
-              className={`min-h-14 rounded-xl border px-4 py-3 text-left transition active:scale-[0.98] ${
+              className={`admin-press admin-transition min-h-14 rounded-xl border px-4 py-3 text-left transition-[transform,background-color,border-color,box-shadow] ${
                 activeGroupStart === group.start
-                  ? "border-blue-500 bg-blue-50 shadow-sm"
-                  : "border-slate-200 bg-slate-50 hover:bg-white"
+                  ? "border-blue-500 bg-blue-50 shadow-[0_10px_24px_rgba(37,99,235,0.12)]"
+                  : "border-slate-200 bg-slate-50 hover:bg-white hover:shadow-[0_8px_20px_rgba(15,23,42,0.06)]"
               }`}
             >
               <span
@@ -193,7 +193,7 @@ export function SmartMemberFinder({
       )}
 
       {searchQuery.trim() && (
-        <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800">
+        <div className="admin-enter-fast mt-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800">
           Showing {visibleCount} result{visibleCount === 1 ? "" : "s"} below
         </div>
       )}

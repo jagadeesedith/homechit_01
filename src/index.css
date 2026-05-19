@@ -129,9 +129,123 @@
   html {
     scroll-behavior: smooth;
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }
 
 @layer components {
+
+  @keyframes admin-fade-slide {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes admin-scale-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes admin-slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .admin-surface {
+    @apply rounded-2xl border border-slate-200/80 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)];
+  }
+
+  .admin-card {
+    @apply rounded-2xl border border-slate-200/80 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)];
+    transition-property: transform, box-shadow, border-color, background-color;
+    transition-duration: 180ms;
+    transition-timing-function: ease-out;
+  }
+
+  .admin-lift {
+    @apply hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_36px_rgba(15,23,42,0.09)];
+  }
+
+  .admin-press {
+    @apply active:scale-[0.99];
+    transition-property: transform;
+    transition-duration: 120ms;
+    transition-timing-function: ease-out;
+  }
+
+  .admin-button {
+    @apply inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+    transition-property: transform, background-color, border-color, box-shadow, color;
+    transition-duration: 180ms;
+    transition-timing-function: ease-out;
+  }
+
+  .admin-transition {
+    transition-duration: 180ms;
+    transition-timing-function: ease-out;
+  }
+
+  .admin-progress {
+    transition-duration: 700ms;
+    transition-timing-function: ease-out;
+  }
+
+  .admin-input {
+    @apply rounded-xl border border-slate-200 bg-slate-50 text-slate-900 shadow-sm outline-none placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100;
+    transition-property: background-color, border-color, box-shadow;
+    transition-duration: 180ms;
+    transition-timing-function: ease-out;
+  }
+
+  .status-paid {
+    @apply border-emerald-200 bg-emerald-50 text-emerald-800;
+  }
+
+  .status-pending {
+    @apply border-red-200 bg-red-50 text-red-800;
+  }
+
+  .admin-enter {
+    animation: admin-fade-slide 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .admin-enter-fast {
+    animation: admin-fade-slide 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .admin-modal-enter {
+    animation: admin-scale-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .admin-slide-up {
+    animation: admin-slide-up 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
 
   .glass-card {
     @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl;

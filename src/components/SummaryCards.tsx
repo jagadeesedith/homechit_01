@@ -113,8 +113,8 @@ const currentTarget = contributionAmount * totalMembers;
         return (
           <div
             key={card.label}
-            className="group relative overflow-hidden bg-white rounded-2xl border border-gray-200/60 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-1 hover:border-gray-300/80"
-            style={{ animationDelay: `${index * 100}ms` }}
+            className="admin-card admin-lift group relative overflow-hidden"
+            style={{ animationDelay: `${index * 60}ms` }}
           >
             {/* Background gradient */}
             <div className={`absolute inset-0 bg-gradient-to-br ${theme.bg} opacity-100`} />
@@ -127,7 +127,7 @@ const currentTarget = contributionAmount * totalMembers;
               {/* Header with icon and label */}
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className={`w-12 h-12 rounded-xl ${theme.iconBg} border border-white/60 shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
+                  <div className={`admin-transition w-12 h-12 rounded-xl ${theme.iconBg} border border-white/60 shadow-sm flex items-center justify-center group-hover:scale-[1.04] transition-transform`}>
                     <Icon className={`w-6 h-6 ${theme.iconTint}`} />
                   </div>
                   <div>
@@ -163,7 +163,7 @@ const currentTarget = contributionAmount * totalMembers;
               {/* Progress bar */}
               <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
                 <div 
-                  className={`h-full ${theme.progressBg} rounded-full transition-all duration-1000 ease-out`}
+                  className={`admin-progress h-full ${theme.progressBg} rounded-full transition-all`}
                   style={{ 
                     width: `${Math.min(100, card.label === 'Total Collected' ? card.percentage : 
                               card.label === 'Outstanding' ? Math.max(0, 100 - card.percentage) : 

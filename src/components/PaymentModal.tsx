@@ -50,9 +50,9 @@ const lastBalance =
   if (!member) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-200">
       <div
-        className="bg-gradient-to-br from-white via-cyan-50/35 to-blue-50 w-full max-w-[520px] mx-4 rounded-3xl shadow-2xl border border-cyan-100 p-5 sm:p-5 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200"
+        className="admin-modal-enter w-full max-w-[520px] mx-4 rounded-3xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50/35 to-blue-50 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.22)] sm:p-5 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Simple premium layout */}
@@ -63,7 +63,7 @@ const lastBalance =
 
             <button
               onClick={onClose}
-              className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center border border-white/10"
+              className="admin-press admin-transition flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white/70 transition-colors hover:bg-white"
               aria-label="Close"
             >
               <X className="w-5 h-5 text-slate-600" />
@@ -71,7 +71,7 @@ const lastBalance =
           </div>
 
           {/* Member name centered */}
-          <div className="bg-gradient-to-r from-cyan-500 to-blue-500 rounded-2xl p-5 mt-1 shadow-lg border border-cyan-300 text-center">
+          <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-cyan-500 to-blue-500 p-5 mt-1 text-center shadow-[0_12px_28px_rgba(14,165,233,0.22)]">
   <h2 className="text-2xl sm:text-3xl font-black text-white">
     {member.name}
   </h2>
@@ -82,7 +82,7 @@ const lastBalance =
 </div>
 
           {/* Last Month Balance card (full width) */}
-          <div className="bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl p-5 text-white shadow-lg">
+          <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 p-5 text-white shadow-[0_12px_28px_rgba(5,150,105,0.2)]">
             <p className="text-sm font-medium text-emerald-100">Last Month Balance</p>
             <h2 className="text-3xl font-black mt-1">{formatINR(lastBalance)}</h2>
           </div>
@@ -121,7 +121,7 @@ const lastBalance =
                   value={principalPaid}
                   onChange={(e) => setPrincipalPaid(e.target.value)}
                   placeholder="Enter amount"
-                  className="mt-2 w-full text-lg sm:text-xl rounded-2xl border border-slate-200 p-5 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/60 focus:border-transparent"
+                  className="admin-input mt-2 w-full p-5 text-lg sm:text-xl"
                   autoFocus
                 />
 
@@ -132,11 +132,11 @@ const lastBalance =
                       key={amount}
                       type="button"
                       onClick={() => setPrincipalPaid(String(amount))}
-                      className={`px-4 py-2 rounded-full text-sm font-semibold transition-all border shadow-sm
+                      className={`admin-press admin-transition rounded-full border px-4 py-2 text-sm font-semibold shadow-sm transition-[background-color,border-color,color,transform]
                         ${
                           principalPaid === String(amount)
-                            ? 'bg-gradient-to-r from-cyan-600 to-teal-500 text-white border-teal-200'
-                            : 'bg-cyan-50 text-cyan-800 border-cyan-100 hover:bg-cyan-100'
+                            ? 'border-teal-200 bg-cyan-600 text-white'
+                            : 'border-cyan-100 bg-cyan-50 text-cyan-800 hover:bg-cyan-100'
                         }`}
                     >
                       ₹{amount}
@@ -162,14 +162,14 @@ const lastBalance =
                   <button
                     type="button"
                     onClick={onClose}
-                    className="flex-1 px-4 py-3 rounded-xl bg-slate-100 border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition"
+                    className="admin-button admin-press flex-1 border border-slate-200 bg-slate-100 px-4 py-3 text-slate-700 hover:bg-slate-200"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={principalPaid.trim() === "" || isNaN(parseFloat(principalPaid))}
-                    className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-teal-500 text-white text-sm font-bold shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="admin-button admin-press flex-1 bg-cyan-600 px-4 py-3 font-bold text-white shadow-[0_10px_24px_rgba(8,145,178,0.2)] hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Confirm Payment
                   </button>
@@ -185,7 +185,7 @@ const lastBalance =
               </div>
               <button
                 onClick={onClose}
-                className="w-full mt-4 px-4 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                className="admin-button admin-press mt-4 w-full border border-slate-200 bg-white px-4 py-3 text-slate-600 hover:bg-slate-50"
               >
                 Close
               </button>

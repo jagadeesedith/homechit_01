@@ -64,7 +64,18 @@ export default function App() {
           }
         />
       </Routes>
-      <Toaster position="top-center" richColors closeButton />
+      <Toaster
+        position="top-center"
+        richColors
+        closeButton
+        toastOptions={{
+          classNames: {
+            toast: "rounded-xl border shadow-[0_18px_40px_rgba(15,23,42,0.14)]",
+            actionButton: "rounded-lg",
+            cancelButton: "rounded-lg",
+          },
+        }}
+      />
     </ChitFundProvider>
   );
 }

@@ -25,9 +25,9 @@ export function MemberGrid({
   const visibleMembers = members ?? state.members;
 
   return (
-    <div>
+    <div className="admin-enter-fast">
       {visibleMembers.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm font-semibold text-slate-500">
+        <div className="admin-surface rounded-2xl border-dashed p-8 text-center text-sm font-semibold text-slate-500">
           No members found
         </div>
       ) : (

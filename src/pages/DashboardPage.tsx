@@ -184,7 +184,7 @@ export function DashboardPage() {
   return (
     <div className="pt-16 lg:pt-0">
       {/* Header Section */}
-      <div className="mb-8">
+      <div className="admin-enter mb-8">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           <div className="space-y-2">
             <div className="flex items-center gap-3">
@@ -218,7 +218,7 @@ export function DashboardPage() {
               <select
                 value={month}
                 onChange={(e) => setSelectedMonthYear(Number(e.target.value), year)}
-                className="appearance-none bg-white border border-gray-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-gray-700 shadow-sm hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                className="admin-input appearance-none px-4 py-3 pr-10 text-sm font-medium text-gray-700 hover:border-gray-300"
               >
                 {MONTHS.map((m, index) => (
                   <option key={m} value={index + 1}>
@@ -234,7 +234,7 @@ export function DashboardPage() {
               <select
                 value={year}
                 onChange={(e) => setSelectedMonthYear(month, Number(e.target.value))}
-                className="appearance-none bg-white border border-gray-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-gray-700 shadow-sm hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                className="admin-input appearance-none px-4 py-3 pr-10 text-sm font-medium text-gray-700 hover:border-gray-300"
               >
                 {years.map((y) => (
                   <option key={y} value={y}>
@@ -248,7 +248,7 @@ export function DashboardPage() {
             {/* Mark All Paid */}
             <button
               onClick={handleMarkAllPaid}
-              className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl text-sm font-semibold shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-200 flex items-center gap-2"
+              className="admin-button admin-press bg-emerald-600 px-6 py-3 text-white shadow-[0_10px_24px_rgba(5,150,105,0.18)] hover:bg-emerald-700"
             >
               <div className="w-4 h-4 bg-white/20 rounded-full flex items-center justify-center">
                 <span className="text-xs">✓</span>
@@ -259,7 +259,7 @@ export function DashboardPage() {
         </div>
 
         {/* Quick Stats Bar */}
-        <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+        <div className="mt-6 rounded-xl border border-blue-100 bg-blue-50 p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <p className="text-sm text-blue-800 font-medium">
               💡 Click on any member card below to record their payment for this month
@@ -287,14 +287,16 @@ export function DashboardPage() {
         onToggleSelectMode={handleToggleSelectMode}
       />
 
-      <SummaryCards month={month} year={year} />
+      <div className="admin-enter" style={{ animationDelay: "80ms" }}>
+        <SummaryCards month={month} year={year} />
+      </div>
 
-      <div className="mt-8">
+      <div className="admin-enter mt-8" style={{ animationDelay: "120ms" }}>
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-xl font-bold text-gray-900">Member Payment Status</h2>
             <p className="text-sm text-gray-600 mt-1">
-              {selectedFilterLabel} · {visibleMembers.length} member
+              {selectedFilterLabel} - {visibleMembers.length} member
               {visibleMembers.length === 1 ? "" : "s"}
             </p>
           </div>
@@ -320,7 +322,7 @@ export function DashboardPage() {
       )}
 
       {selectMode && selectedMemberIds.size > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 p-3 shadow-2xl backdrop-blur lg:left-[280px]">
+        <div className="admin-slide-up fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-14px_36px_rgba(15,23,42,0.12)] backdrop-blur lg:left-[280px]">
           <div className="mx-auto flex max-w-5xl items-center gap-3">
             <div className="flex-1">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -333,14 +335,14 @@ export function DashboardPage() {
             <button
               type="button"
               onClick={clearSelection}
-              className="min-h-12 rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-700"
+              className="admin-button admin-press border border-slate-200 bg-white px-4 text-slate-700 hover:bg-slate-50"
             >
               Clear Selection
             </button>
             <button
               type="button"
               onClick={() => setShowBatchConfirm(true)}
-              className="min-h-12 rounded-xl bg-emerald-600 px-5 text-sm font-black text-white shadow-lg shadow-emerald-600/20"
+              className="admin-button admin-press bg-emerald-600 px-5 font-black text-white shadow-[0_10px_24px_rgba(5,150,105,0.2)] hover:bg-emerald-700"
             >
               Mark Paid
             </button>
@@ -363,7 +365,7 @@ export function DashboardPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleBatchMarkPaid}
-              className="bg-emerald-600 text-white hover:bg-emerald-700"
+              className="admin-transition bg-emerald-600 text-white transition-colors hover:bg-emerald-700"
             >
               Confirm
             </AlertDialogAction>
