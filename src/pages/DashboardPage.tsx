@@ -1,16 +1,178 @@
+import { useMemo, useState } from "react";
 import { SummaryCards } from "@/components/SummaryCards";
 import { MemberGrid } from "@/components/MemberGrid";
+import { PaymentModal } from "@/components/PaymentModal";
+import {
+  SmartMemberFinder,
+  type FinderMode,
+} from "@/components/SmartMemberFinder";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { MONTHS } from "@/types";
 import { useChitFund } from "../context/ChitFundContext";
 import { Calendar, ChevronDown, Users, TrendingUp } from "lucide-react";
+import { toast } from "sonner";
 
 export function DashboardPage() {
-  const { state, markAllPaidForMonth, setSelectedMonthYear } = useChitFund();
+  const {
+    state,
+    markAllPaidForMonth,
+    markMembersPaidForMonth,
+    setSelectedMonthYear,
+    hasMemberPaid,
+  } = useChitFund();
   const month = state.selectedMonth;
   const year = state.selectedYear;
+  const [selectedMember, setSelectedMember] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [finderMode, setFinderMode] = useState<FinderMode>("groups");
+  const [activeGroupStart, setActiveGroupStart] = useState<number | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [showBatchConfirm, setShowBatchConfirm] = useState(false);
 
   const handleMarkAllPaid = async () => {
     await markAllPaidForMonth(month, year);
+  };
+
+  const sortedMembers = useMemo(
+    () =>
+      [...state.members].sort((a, b) => {
+        const aNumber = Number(a.id);
+        const bNumber = Number(b.id);
+        if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
+          return aNumber - bNumber;
+        }
+        return a.id.localeCompare(b.id);
+      }),
+    [state.members],
+  );
+  const maxMemberNumber = useMemo(
+    () =>
+      Math.max(
+        0,
+        ...sortedMembers
+          .map((member) => Number(member.id))
+          .filter((id) => Number.isFinite(id)),
+      ),
+    [sortedMembers],
+  );
+
+  const visibleMembers = useMemo(() => {
+    const query = searchQuery.trim().toLocaleLowerCase();
+    const phoneQuery = searchQuery.replace(/\D/g, "");
+
+    if (query) {
+      return sortedMembers.filter((member) => {
+        const phone = (member.phone || "").replace(/\D/g, "");
+        return (
+          member.id.toLocaleLowerCase().includes(query) ||
+          member.name.toLocaleLowerCase().includes(query) ||
+          (!!phoneQuery && phone.includes(phoneQuery))
+        );
+      });
+    }
+
+    if (finderMode === "groups" && activeGroupStart !== null) {
+      return sortedMembers.filter((member) => {
+        const memberNumber = Number(member.id);
+        return (
+          Number.isFinite(memberNumber) &&
+          memberNumber >= activeGroupStart &&
+          memberNumber <= activeGroupStart + 9
+        );
+      });
+    }
+
+    return sortedMembers;
+  }, [activeGroupStart, finderMode, searchQuery, sortedMembers]);
+
+  const selectedFilterLabel = useMemo(() => {
+    if (searchQuery.trim()) return "Search results";
+    if (finderMode === "all") return "All members";
+    if (activeGroupStart !== null) {
+      return `${activeGroupStart}-${Math.min(activeGroupStart + 9, maxMemberNumber)}`;
+    }
+    return "All members";
+  }, [activeGroupStart, finderMode, maxMemberNumber, searchQuery]);
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    if (query.trim()) setActiveGroupStart(null);
+  };
+
+  const handleFinderModeChange = (mode: FinderMode) => {
+    setFinderMode(mode);
+    setActiveGroupStart(null);
+    if (mode === "all") setSearchQuery("");
+  };
+
+  const handleActiveGroupChange = (groupStart: number | null) => {
+    setActiveGroupStart(groupStart);
+    if (groupStart !== null) {
+      setFinderMode("groups");
+      setSearchQuery("");
+    }
+  };
+
+  const openMember = (memberId: string) => {
+    setSelectedMember(memberId);
+  };
+
+  const toggleMemberSelection = (memberId: string) => {
+    setSelectedMemberIds((current) => {
+      const next = new Set(current);
+      if (next.has(memberId)) {
+        next.delete(memberId);
+      } else {
+        next.add(memberId);
+      }
+      return next;
+    });
+  };
+
+  const handleToggleSelectMode = () => {
+    setSelectMode((current) => !current);
+    setSelectedMemberIds(new Set());
+  };
+
+  const clearSelection = () => {
+    setSelectedMemberIds(new Set());
+  };
+
+  const handleBatchMarkPaid = async () => {
+    try {
+      const markedCount = await markMembersPaidForMonth(
+        Array.from(selectedMemberIds),
+        month,
+        year,
+      );
+
+      clearSelection();
+      setShowBatchConfirm(false);
+
+      if (markedCount === 0) {
+        toast.info("Selected members are already paid");
+        return;
+      }
+
+      toast.success(
+        `Marked ${markedCount} member${markedCount === 1 ? "" : "s"} as paid`,
+      );
+    } catch (error) {
+      console.error(error);
+      toast.error("Could not mark selected members as paid");
+    }
   };
 
   const currentYear = new Date().getFullYear();
@@ -110,17 +272,104 @@ export function DashboardPage() {
         </div>
       </div>
 
+      <SmartMemberFinder
+        members={sortedMembers}
+        month={month}
+        year={year}
+        searchQuery={searchQuery}
+        selectMode={selectMode}
+        mode={finderMode}
+        activeGroupStart={activeGroupStart}
+        onSearchQueryChange={handleSearchChange}
+        onModeChange={handleFinderModeChange}
+        onActiveGroupStartChange={handleActiveGroupChange}
+        hasMemberPaid={hasMemberPaid}
+        onToggleSelectMode={handleToggleSelectMode}
+      />
+
       <SummaryCards month={month} year={year} />
 
       <div className="mt-8">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-xl font-bold text-gray-900">Member Payment Status</h2>
-            <p className="text-sm text-gray-600 mt-1">Track and manage monthly contributions</p>
+            <p className="text-sm text-gray-600 mt-1">
+              {selectedFilterLabel} · {visibleMembers.length} member
+              {visibleMembers.length === 1 ? "" : "s"}
+            </p>
           </div>
         </div>
-        <MemberGrid month={month} year={year} />
+        <MemberGrid
+          month={month}
+          year={year}
+          members={visibleMembers}
+          selectMode={selectMode}
+          selectedMemberIds={selectedMemberIds}
+          onOpenMember={openMember}
+          onToggleMember={toggleMemberSelection}
+        />
       </div>
+
+      {selectedMember && (
+        <PaymentModal
+          memberId={selectedMember}
+          month={month}
+          year={year}
+          onClose={() => setSelectedMember(null)}
+        />
+      )}
+
+      {selectMode && selectedMemberIds.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 p-3 shadow-2xl backdrop-blur lg:left-[280px]">
+          <div className="mx-auto flex max-w-5xl items-center gap-3">
+            <div className="flex-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Selected
+              </p>
+              <p className="text-lg font-black text-slate-950">
+                {selectedMemberIds.size}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={clearSelection}
+              className="min-h-12 rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-700"
+            >
+              Clear Selection
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowBatchConfirm(true)}
+              className="min-h-12 rounded-xl bg-emerald-600 px-5 text-sm font-black text-white shadow-lg shadow-emerald-600/20"
+            >
+              Mark Paid
+            </button>
+          </div>
+        </div>
+      )}
+
+      <AlertDialog open={showBatchConfirm} onOpenChange={setShowBatchConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Mark {selectedMemberIds.size} members as paid?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will record the monthly contribution for the selected members
+              for {MONTHS[month - 1]} {year}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBatchMarkPaid}
+              className="bg-emerald-600 text-white hover:bg-emerald-700"
+            >
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

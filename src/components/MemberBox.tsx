@@ -1,13 +1,25 @@
 import { useChitFund } from '../context/ChitFundContext';
+import { Check } from "lucide-react";
 
 interface MemberBoxProps {
   memberId: string;
   month: number;
   year: number;
   onClick: () => void;
+  selectMode?: boolean;
+  selected?: boolean;
+  onToggle?: () => void;
 }
 
-export function MemberBox({ memberId, month, year, onClick }: MemberBoxProps) {
+export function MemberBox({
+  memberId,
+  month,
+  year,
+  onClick,
+  selectMode = false,
+  selected = false,
+  onToggle,
+}: MemberBoxProps) {
   const { state, hasMemberPaid } = useChitFund();
   const member = state.members.find(m => m.id === memberId);
   const isPaid = hasMemberPaid(memberId, month, year);
@@ -16,7 +28,13 @@ export function MemberBox({ memberId, month, year, onClick }: MemberBoxProps) {
 
   return (
     <button
-      onClick={onClick}
+      onClick={() => {
+        if (selectMode) {
+          onToggle?.();
+          return;
+        }
+        onClick();
+      }}
       className={`
         group relative p-4 rounded-2xl border flex flex-col items-center justify-center cursor-pointer
         transition-all duration-300 ease-in-out min-h-[90px] w-full
@@ -25,10 +43,23 @@ export function MemberBox({ memberId, month, year, onClick }: MemberBoxProps) {
           ? 'bg-gradient-to-br from-emerald-50 to-green-100 border-green-200 text-emerald-700 hover:from-emerald-100 hover:to-green-200 hover:border-green-300'
           : 'bg-gradient-to-br from-rose-50 to-red-100 border-red-200 text-red-700 hover:from-rose-100 hover:to-red-200 hover:border-red-300'
         }
+        ${selected ? "ring-4 ring-blue-500 ring-offset-2" : ""}
         focus:outline-none focus:ring-4 focus:ring-blue-100 focus:ring-offset-2
         overflow-hidden
       `}
     >
+      {selectMode && (
+        <span
+          className={`absolute left-2 top-2 z-20 flex h-6 w-6 items-center justify-center rounded-md border ${
+            selected
+              ? "border-blue-600 bg-blue-600 text-white"
+              : "border-slate-300 bg-white text-transparent"
+          }`}
+        >
+          <Check className="h-4 w-4" />
+        </span>
+      )}
+
       {/* Background decoration */}
       <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
       <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-white/30 blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300" />

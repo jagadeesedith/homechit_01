@@ -151,6 +151,11 @@ interface ContextValue {
     principalPaid: number,
   ) => Promise<MonthlyPayment | null>;
   markAllPaidForMonth: (month: number, year: number) => Promise<void>;
+  markMembersPaidForMonth: (
+    memberIds: string[],
+    month: number,
+    year: number,
+  ) => Promise<number>;
   addDistribution: (
     memberId: string,
     month: number,
@@ -438,6 +443,69 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const markMembersPaidForMonth = async (
+    memberIds: string[],
+    month: number,
+    year: number,
+  ): Promise<number> => {
+    const user = auth.currentUser;
+    if (!user || memberIds.length === 0) return 0;
+
+    const selectedIds = new Set(memberIds);
+    const alreadyPaid = new Set(
+      state.payments
+        .filter((p) => p.month === month && p.year === year)
+        .map((p) => p.memberId),
+    );
+
+    const payments: MonthlyPayment[] = [...state.members]
+      .sort((a, b) => parseInt(a.id) - parseInt(b.id))
+      .filter((member) => selectedIds.has(member.id) && !alreadyPaid.has(member.id))
+      .map((member) => {
+        const isFirstMonth =
+          month === state.settings.startMonth &&
+          year === state.settings.startYear;
+
+        const contribution = isFirstMonth
+          ? state.settings.firstMonthAmount
+          : state.settings.monthlyAmount;
+
+        const principalPaid = 0;
+        const interest = (member.balance * state.settings.interestRate) / 100;
+        const totalPaid = contribution + principalPaid + interest;
+
+        return {
+          id: paymentDocId(member.id, month, year),
+          memberId: member.id,
+          month,
+          year,
+          previousBalance: member.balance,
+          contribution,
+          principalPaid,
+          interest,
+          totalPaid,
+          newBalance: member.balance,
+          paidAt: new Date().toISOString(),
+        };
+      });
+
+    for (let i = 0; i < payments.length; i += 450) {
+      const batch = writeBatch(db);
+      for (const payment of payments.slice(i, i + 450)) {
+        batch.set(doc(db, "users", user.uid, "payments", payment.id), payment, {
+          merge: true,
+        });
+      }
+      await batch.commit();
+    }
+
+    if (payments.length > 0) {
+      dispatch({ type: "MARK_ALL_PAID", payload: payments });
+    }
+
+    return payments.length;
+  };
+
   const addDistribution = async (
     memberId: string,
     month: number,
@@ -574,6 +642,7 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
         deleteMember,
         recordPayment,
         markAllPaidForMonth,
+        markMembersPaidForMonth,
         addDistribution,
         deleteDistribution,
         updateSettings,
