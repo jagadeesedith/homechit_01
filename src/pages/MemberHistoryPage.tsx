@@ -159,7 +159,7 @@ export function MemberHistoryPage() {
                 ? 0
                 : Number(row.PreviousBalance),
 
-              contribution: Number(row.distribution || 0),
+              contribution: Number(row.Contribution || 0),
 
               principalPaid: isNaN(Number(row.PrincipalPaid))
                 ? 0
@@ -175,18 +175,55 @@ export function MemberHistoryPage() {
                 ? 0
                 : Number(row.NewBalance),
 
+              givenMoney: Number(row["given amount"] || 0),
+
               paidAt: new Date().toISOString(),
             },
-            { merge: true },
+            { merge: false },
           );
+          
+          
+          const givenMoney =
+  Number(row["given amount"] || 0);
+
+          if (givenMoney > 0) {
+            const distributionId = `${year}-${month}-${memberId}`;
+
+            const member = state.members.find(
+              (m) => m.id === memberId,
+            );
+
+            await setDoc(
+              doc(
+                db,
+                "users",
+                userId,
+                "distributions",
+                distributionId,
+              ),
+              {
+                id: distributionId,
+                memberId,
+                memberName: member?.name || "",
+                month,
+                year,
+                amount: givenMoney,
+                status: "Given",
+                createdAt: new Date().toISOString(),
+              },
+              { merge: false },
+            );
+          }
         }
       }
+
 
       alert("All Excel Files Imported Successfully ✅");
 
       e.target.value = "";
 
       await reloadFromFirestore();
+      window.location.reload();
     } catch (error) {
       console.error(error);
 
@@ -375,7 +412,11 @@ export function MemberHistoryPage() {
                     <DollarSign className="w-6 h-6 text-blue-600" />
                   </div>
                   <span className="text-2xl font-black text-gray-900">
-                    {formatINR(member.balance)}
+                    {formatINR(
+                      [...payments].sort((a, b) =>
+                        b.year - a.year || b.month - a.month
+                      )[0]?.newBalance ?? 0
+                    )}
                   </span>
                 </div>
                 <p className="text-sm font-bold text-gray-700">
@@ -461,12 +502,15 @@ export function MemberHistoryPage() {
                       <th className="text-right text-xs font-bold text-gray-700 uppercase tracking-wider px-6 py-4">
                         New Balance
                       </th>
+                      <th className="text-right text-xs font-bold text-gray-700 uppercase tracking-wider px-6 py-4">
+                        Given Money
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {payments.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-6 py-12 text-center">
+                        <td colSpan={8} className="px-6 py-12 text-center">
                           <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
                           <p className="text-gray-500 font-medium">
                             No payment history found
@@ -486,9 +530,7 @@ export function MemberHistoryPage() {
                             {MONTHS[payment.month - 1]} {payment.year}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-700 text-right">
-                            {formatINR(
-                              payment.newBalance + payment.principalPaid,
-                            )}
+                            {formatINR(payment.previousBalance)}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-700 text-right">
                             {formatINR(payment.contribution)}
@@ -504,6 +546,9 @@ export function MemberHistoryPage() {
                           </td>
                           <td className="px-6 py-4 text-sm font-bold text-teal-600 text-right">
                             {formatINR(payment.newBalance)}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-blue-600 text-right">
+                            {formatINR(payment.givenMoney || 0)}
                           </td>
                         </tr>
                       ))

@@ -1,6 +1,7 @@
 import { useChitFund } from '../context/ChitFundContext';
 import { formatINR } from '@/lib/utils';
 import { Wallet, AlertCircle, Banknote, TrendingUp, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import type { MonthlyPayment } from '@/types';
 
 interface SummaryCardsProps {
   month: number;
@@ -27,9 +28,25 @@ const contributionAmount = isFirstMonth
 const currentTarget = contributionAmount * totalMembers;
   const outstanding = Math.max(0, currentTarget - totalCollected);
 
-  const totalLoaned = state.members.reduce((sum, m) => sum + m.balance, 0);
+  const latestPayments = new Map<string, MonthlyPayment>();
+  payments.forEach((p) => {
+    const existing = latestPayments.get(p.memberId);
+    if (
+      !existing ||
+      new Date(`${p.year}-${p.month}`) >
+        new Date(`${existing.year}-${existing.month}`)
+    ) {
+      latestPayments.set(p.memberId, p);
+    }
+  });
 
-  const projectedInterest = payments.reduce((sum, p) => sum + p.interest, 0);
+  const activeLoans = Array.from(latestPayments.values()).reduce(
+    (sum, p) => sum + (p.newBalance || 0),
+    0,
+  );
+
+  const totalLoaned = activeLoans;
+  const projectedInterest = totalLoaned * (state.settings.interestRate / 100);
 
   const collectionRate = currentTarget > 0 ? Math.round((totalCollected / currentTarget) * 100) : 0;
   

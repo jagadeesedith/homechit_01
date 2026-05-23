@@ -358,6 +358,7 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
       interest,
       totalPaid,
       newBalance,
+      givenMoney: 0,
       paidAt: new Date().toISOString(),
     };
 
@@ -426,6 +427,7 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
         interest,
         totalPaid,
         newBalance: member.balance,
+        givenMoney: 0,
         paidAt: new Date().toISOString(),
       };
     });
@@ -485,6 +487,7 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
           interest,
           totalPaid,
           newBalance: member.balance,
+          givenMoney: 0,
           paidAt: new Date().toISOString(),
         };
       });
@@ -612,9 +615,11 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
   };
 
   const getTotalCollectedForMonth = (month: number, year: number) => {
-    return state.payments
+    const totalCollected = state.payments
       .filter((p) => p.month === month && p.year === year)
-      .reduce((sum, p) => sum + p.totalPaid, 0);
+      .reduce((sum, p) => sum + (p.totalPaid || 0), 0);
+
+    return totalCollected;
   };
 
   const hasMemberPaid = (memberId: string, month: number, year: number) => {

@@ -301,7 +301,16 @@ export function MemberListPage() {
                       {member.joinDate}
                     </td>
                     <td className="px-4 py-3 text-sm text-[#1d1d1d] text-right font-medium">
-                      {formatINR(member.balance)}
+                      {formatINR(
+                        (() => {
+                          const latestPayment = state.payments
+                            .filter((p) => p.memberId === member.id)
+                            .sort((a, b) =>
+                              b.year - a.year || b.month - a.month,
+                            )[0];
+                          return latestPayment?.newBalance ?? 0;
+                        })()
+                      )}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-2">

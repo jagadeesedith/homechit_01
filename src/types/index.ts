@@ -11,25 +11,20 @@ export interface Member {
 export interface MonthlyPayment {
 
   id: string;
-
   memberId: string;
-
   month: number;
-
   year: number;
 
   previousBalance: number;
-
   contribution: number;
 
   principalPaid: number;
-
   interest: number;
-
   totalPaid: number;
 
   newBalance: number;
-
+  givenMoney: number;
+  
   paidAt: string;
 }
 

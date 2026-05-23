@@ -24,7 +24,14 @@ export function MonthlySummaryPage() {
     total: payments.reduce((s, p) => s + p.totalPaid, 0),
   };
 
-  const paidPercentage = state.members.length > 0 ? Math.round((payments.length / state.members.length) * 100) : 0;
+  const uniquePaidMemberIds = new Set(payments.map((p) => p.memberId));
+  const paidMembersCount = uniquePaidMemberIds.size;
+  const pendingMembersCount = Math.max(0, state.members.length - paidMembersCount);
+
+  const paidPercentage =
+    state.members.length > 0
+      ? Math.round((paidMembersCount / state.members.length) * 100)
+      : 0;
 
   return (
     <div className="pt-16 lg:pt-0">
@@ -72,7 +79,7 @@ export function MonthlySummaryPage() {
               <span className="text-2xl font-black text-rose-900">{state.members.length - payments.length}</span>
             </div>
             <p className="text-sm font-medium text-rose-800">Members Pending</p>
-            <p className="text-xs text-rose-600 mt-1">Awaiting payment</p>
+            <p className="text-xs text-rose-600 mt-1">{pendingMembersCount} pending</p>
           </div>
 
           <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100 rounded-2xl p-6 shadow-lg">
