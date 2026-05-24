@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useChitFund } from '../context/ChitFundContext';
+import { ChitFundError, useChitFund } from '../context/ChitFundContext';
+import { toast } from 'sonner';
 import { formatINR } from '@/lib/utils';
 import { X } from 'lucide-react';
 
@@ -11,29 +12,20 @@ interface PaymentModalProps {
 }
 
 export function PaymentModal({ memberId, month, year, onClose }: PaymentModalProps) {
-  const { state, recordPayment, hasMemberPaid, getMemberPayments } = useChitFund();
+  const {
+    state,
+    recordPayment,
+    hasMemberPaid,
+    getMemberOutstandingBalance,
+    getContributionAmount,
+  } = useChitFund();
   const [principalPaid, setPrincipalPaid] = useState('0');
 
   const member = state.members.find(m => m.id === memberId);
   const isAlreadyPaid = hasMemberPaid(memberId, month, year);
 
-  const isFirstMonth =
-    month === state.settings.startMonth && year === state.settings.startYear;
-  const contribution = isFirstMonth
-    ? state.settings.firstMonthAmount
-    : state.settings.monthlyAmount;
-
-  const memberPayments = getMemberPayments(memberId);
-
-const latestPayment = [...memberPayments].sort((a, b) => {
-  if (a.year !== b.year) return b.year - a.year;
-  return b.month - a.month;
-})[0];
-
-
-
-const lastBalance =
-  latestPayment?.newBalance ?? member?.balance ?? 0;
+  const contribution = getContributionAmount(month, year);
+  const lastBalance = getMemberOutstandingBalance(memberId);
 
   const principalNum = parseFloat(principalPaid) || 0;
   const interest = (lastBalance * state.settings.interestRate) / 100;
@@ -43,8 +35,16 @@ const lastBalance =
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (principalPaid.trim() === "" || isNaN(parseFloat(principalPaid))) return;
-    await recordPayment(memberId, month, year, principalNum);
-    onClose();
+    try {
+      await recordPayment(memberId, month, year, principalNum);
+      onClose();
+    } catch (error) {
+      const message =
+        error instanceof ChitFundError
+          ? error.message
+          : 'Could not record payment';
+      toast.error(message);
+    }
   };
 
   if (!member) return null;

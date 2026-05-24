@@ -9,13 +9,17 @@ interface SummaryCardsProps {
 }
 
 export function SummaryCards({ month, year }: SummaryCardsProps) {
-  const { state, getTotalCollectedForMonth, getMonthPayments } = useChitFund();
+  const {
+    state,
+    getTotalCollectedForMonth,
+    getMonthPayments,
+    getPendingCountForMonth,
+  } = useChitFund();
 
   const payments = getMonthPayments(month, year);
   const totalCollected = getTotalCollectedForMonth(month, year);
   const totalMembers = state.members.length;
-  const paidCount = payments.length;
-  const unpaidCount = totalMembers - paidCount;
+  const unpaidCount = getPendingCountForMonth(month, year);
 
  const isFirstMonth =
   month === state.settings.startMonth &&

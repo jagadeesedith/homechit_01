@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Accidental nested copy (stale duplicate project tree)
+/homechit_01/

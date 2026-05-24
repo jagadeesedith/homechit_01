@@ -1,8 +1,10 @@
 import { useState } from "react";
-import * as XLSX from "xlsx";
-import { doc, setDoc } from "firebase/firestore";
 import { useChitFund } from "../context/ChitFundContext";
 import { formatINR } from "@/lib/utils";
+import {
+  formatImportReport,
+  importPaymentHistoryFiles,
+} from "@/lib/importHistory";
 import { MONTHS } from "@/types";
 import {
   Search,
@@ -16,7 +18,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 
 export function MemberHistoryPage() {
   const { state, getMemberPayments, reloadFromFirestore } = useChitFund();
@@ -84,152 +86,35 @@ export function MemberHistoryPage() {
     }
   };
 
+  const [importing, setImporting] = useState(false);
+
   const importHistory = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+
+    if (files.length === 0) return;
+
+    const user = auth.currentUser;
+    if (!user) {
+      alert("User not logged in");
+      return;
+    }
+
+    setImporting(true);
     try {
-      alert("Import Started");
-
-      const files = Array.from(e.target.files || []);
-
-      if (!files || files.length === 0) {
-        alert("No file selected");
-        return;
-      }
-
-      const user = auth.currentUser;
-
-      if (!user) {
-        alert("User not logged in");
-        return;
-      }
-
-      const userId = user.uid;
-
-      const parseMonthField = (monthValue: unknown) => {
-        let month = 0;
-        let year = 0;
-
-        if (typeof monthValue === "number") {
-          const parsedDate = XLSX.SSF.parse_date_code(monthValue);
-
-          if (parsedDate) {
-            month = parsedDate.m;
-            year = parsedDate.y;
-          }
-        } else if (typeof monthValue === "string") {
-          const date = new Date(monthValue);
-
-          if (!isNaN(date.getTime())) {
-            month = date.getMonth() + 1;
-            year = date.getFullYear();
-          }
-        }
-
-        return { month, year };
-      };
-
-      // Loop through all selected files
-      for (const file of files) {
-        alert(`Importing ${file.name}`);
-
-        const data = await file.arrayBuffer();
-        const workbook = XLSX.read(data);
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(sheet);
-
-        for (const row of rows as Record<string, unknown>[]) {
-          const memberId = String(row.memberID || "").trim();
-
-          if (!memberId) continue;
-
-          const { month, year } = parseMonthField(row.Month);
-
-          if (!month || !year) continue;
-
-          const paymentId = `${year}-${month}-${memberId}`;
-
-          await setDoc(
-            doc(db, "users", userId, "payments", paymentId),
-            {
-              id: paymentId,
-              memberId,
-              month,
-              year,
-
-              previousBalance: isNaN(Number(row.PreviousBalance))
-                ? 0
-                : Number(row.PreviousBalance),
-
-              contribution: Number(row.Contribution || 0),
-
-              principalPaid: isNaN(Number(row.PrincipalPaid))
-                ? 0
-                : Number(row.PrincipalPaid),
-
-              interest: isNaN(Number(row.Interest)) ? 0 : Number(row.Interest),
-
-              totalPaid: isNaN(Number(row.TotalPaid))
-                ? 0
-                : Number(row.TotalPaid),
-
-              newBalance: isNaN(Number(row.NewBalance))
-                ? 0
-                : Number(row.NewBalance),
-
-              givenMoney: Number(row["given amount"] || 0),
-
-              paidAt: new Date().toISOString(),
-            },
-            { merge: false },
-          );
-          
-          
-          const givenMoney =
-  Number(row["given amount"] || 0);
-
-          if (givenMoney > 0) {
-            const distributionId = `${year}-${month}-${memberId}`;
-
-            const member = state.members.find(
-              (m) => m.id === memberId,
-            );
-
-            await setDoc(
-              doc(
-                db,
-                "users",
-                userId,
-                "distributions",
-                distributionId,
-              ),
-              {
-                id: distributionId,
-                memberId,
-                memberName: member?.name || "",
-                month,
-                year,
-                amount: givenMoney,
-                status: "Given",
-                createdAt: new Date().toISOString(),
-              },
-              { merge: false },
-            );
-          }
-        }
-      }
-
-
-      alert("All Excel Files Imported Successfully ✅");
-
-      e.target.value = "";
-
+      const report = await importPaymentHistoryFiles(
+        files,
+        user.uid,
+        state.members,
+      );
       await reloadFromFirestore();
-      window.location.reload();
+      alert(`Import complete\n\n${formatImportReport(report)}`);
     } catch (error) {
       console.error(error);
-
       const message = error instanceof Error ? error.message : String(error);
-
       alert("Import Error: " + message);
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -263,14 +148,17 @@ export function MemberHistoryPage() {
             </div>
           </div>
 
-          <label className="bg-gradient-to-r from-emerald-500 to-green-600 text-white px-6 py-3 rounded-xl cursor-pointer hover:from-emerald-600 hover:to-green-700 transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl font-medium">
+          <label className={`bg-gradient-to-r from-emerald-500 to-green-600 text-white px-6 py-3 rounded-xl transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl font-medium ${
+            importing ? 'opacity-60 cursor-wait' : 'cursor-pointer hover:from-emerald-600 hover:to-green-700'
+          }`}>
             <Upload className="w-4 h-4" />
-            Import History
+            {importing ? 'Importing...' : 'Import History'}
             <input
               type="file"
               accept=".xlsx,.xls"
               multiple
               hidden
+              disabled={importing}
               onChange={importHistory}
             />
           </label>

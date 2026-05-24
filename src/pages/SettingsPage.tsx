@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useChitFund } from '../context/ChitFundContext';
 import {
   Settings as SettingsIcon,
@@ -19,10 +19,16 @@ import emailjs from '@emailjs/browser';
 import {
   collection,
   getDocs,
+  limit,
+  query,
   writeBatch,
 } from 'firebase/firestore';
 
 import { auth, db } from '../lib/firebase';
+import { buildConsistencyReport } from '@/lib/consistencyCheck';
+import { consolidateLegacyPaymentDocs } from '@/lib/legacyPaymentCleanup';
+import { formatINR } from '@/lib/utils';
+import { MONTHS } from '@/types';
 
 type ResetStep = 'confirm' | 'verify' | 'busy' | 'done' | 'error';
 
@@ -40,6 +46,8 @@ type ResetState = {
 };
 
 const RESET_PHRASE = 'RESET EVERYTHING';
+const OTP_COOLDOWN_MS = 30_000;
+const DELETE_BATCH_SIZE = 450;
 
 function getMaskedGmail(email?: string | null) {
   if (!email) return '';
@@ -61,25 +69,56 @@ function generateOtp() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-async function deleteMemberSubcollection(userId: string, collectionName: string) {
+async function deleteAllInSubcollection(
+  userId: string,
+  collectionName: string,
+): Promise<number> {
   const colRef = collection(db, 'users', userId, collectionName);
-  const snap = await getDocs(colRef);
+  let totalDeleted = 0;
 
-  if (snap.empty) return;
+  while (true) {
+    const snap = await getDocs(query(colRef, limit(DELETE_BATCH_SIZE)));
+    if (snap.empty) break;
 
-  const batch = writeBatch(db);
-  snap.forEach((docSnap) => {
-    batch.delete(docSnap.ref);
-  });
+    const batch = writeBatch(db);
+    snap.forEach((docSnap) => {
+      batch.delete(docSnap.ref);
+    });
+    await batch.commit();
+    totalDeleted += snap.size;
 
-  await batch.commit();
+    if (snap.size < DELETE_BATCH_SIZE) break;
+  }
+
+  return totalDeleted;
 }
 
 export function SettingsPage() {
-  const { state, updateSettings } = useChitFund();
+  const { state, updateSettings, reloadFromFirestore } = useChitFund();
   const initialForm = useMemo(() => state.settings, [state.settings]);
   const [form, setForm] = useState(initialForm);
   const [saved, setSaved] = useState(false);
+  const [cleaningLegacy, setCleaningLegacy] = useState(false);
+
+  const consistencyReport = useMemo(
+    () =>
+      buildConsistencyReport(
+        state.members,
+        state.payments,
+        state.distributions,
+        state.settings,
+        state.selectedMonth,
+        state.selectedYear,
+      ),
+    [
+      state.members,
+      state.payments,
+      state.distributions,
+      state.settings,
+      state.selectedMonth,
+      state.selectedYear,
+    ],
+  );
 
   const [reset, setReset] = useState<ResetState>({
     open: false,
@@ -99,6 +138,35 @@ export function SettingsPage() {
     await updateSettings(form);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
+  };
+
+  const handleConsolidateLegacyPayments = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      alert('Login first');
+      return;
+    }
+    if (
+      !confirm(
+        'Remove duplicate payment documents (legacy IDs) and keep one canonical record per member/month?',
+      )
+    ) {
+      return;
+    }
+
+    setCleaningLegacy(true);
+    try {
+      const report = await consolidateLegacyPaymentDocs(user.uid);
+      await reloadFromFirestore();
+      alert(
+        `Consolidation complete.\nKept: ${report.keptCount} periods\nDeleted: ${report.deletedCount} duplicate doc(s)`,
+      );
+    } catch (e) {
+      console.error(e);
+      alert('Consolidation failed. See console for details.');
+    } finally {
+      setCleaningLegacy(false);
+    }
   };
 
   const closeResetModal = () => {
@@ -247,21 +315,25 @@ export function SettingsPage() {
     try {
       const userId = user.uid;
 
-      // delete only for currently logged in user
-      await deleteMemberSubcollection(userId, 'members');
-      await deleteMemberSubcollection(userId, 'payments');
-      await deleteMemberSubcollection(userId, 'distributions');
+      const deletedMembers = await deleteAllInSubcollection(userId, 'members');
+      const deletedPayments = await deleteAllInSubcollection(userId, 'payments');
+      const deletedDistributions = await deleteAllInSubcollection(
+        userId,
+        'distributions',
+      );
 
-      // success
       setReset((prev) => ({
         ...prev,
         step: 'done',
         loadingReset: false,
       }));
 
-      alert('Reset complete. The app data has been cleared for this account.');
+      await reloadFromFirestore();
 
-      // close after a short delay
+      alert(
+        `Reset complete.\nDeleted ${deletedMembers} members, ${deletedPayments} payments, ${deletedDistributions} distributions.`,
+      );
+
       setTimeout(() => closeResetModal(), 1200);
     } catch (e) {
       console.error(e);
@@ -274,12 +346,23 @@ export function SettingsPage() {
     }
   };
 
+  const [cooldownTick, setCooldownTick] = useState(0);
+
+  useEffect(() => {
+    if (reset.step !== 'verify' || !reset.lastSentAt) return;
+    const timer = setInterval(() => setCooldownTick((t) => t + 1), 1000);
+    return () => clearInterval(timer);
+  }, [reset.step, reset.lastSentAt]);
+
   const resetConfirmMatches = reset.confirmText.trim() === RESET_PHRASE;
 
   const disableDeleteButton = !resetConfirmMatches || reset.loadingSendOtp;
 
-  // Avoid Date.now() in render (React purity). We only enforce resend cooldown after clicking resend.
-  const canResendOtp = true;
+  const otpCooldownRemainingMs = reset.lastSentAt
+    ? Math.max(0, OTP_COOLDOWN_MS - (Date.now() - reset.lastSentAt))
+    : 0;
+  const canResendOtp = otpCooldownRemainingMs === 0;
+  void cooldownTick;
 
 
   return (
@@ -499,6 +582,65 @@ export function SettingsPage() {
           </div>
         </div>
 
+        {/* Data health */}
+        <div className="mt-6 bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden">
+          <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-slate-50 to-gray-100">
+            <h3 className="text-lg font-bold text-gray-900">Data health</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Cross-check totals for {MONTHS[state.selectedMonth - 1]} {state.selectedYear}{' '}
+              (same rules as Dashboard)
+            </p>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <div className="rounded-xl bg-gray-50 p-3 border border-gray-100">
+                <p className="text-gray-500 text-xs font-medium">Paid</p>
+                <p className="text-lg font-black text-gray-900">{consistencyReport.paidCount}</p>
+              </div>
+              <div className="rounded-xl bg-gray-50 p-3 border border-gray-100">
+                <p className="text-gray-500 text-xs font-medium">Pending</p>
+                <p className="text-lg font-black text-gray-900">{consistencyReport.pendingCount}</p>
+              </div>
+              <div className="rounded-xl bg-gray-50 p-3 border border-gray-100">
+                <p className="text-gray-500 text-xs font-medium">Collected</p>
+                <p className="text-lg font-black text-gray-900">
+                  {formatINR(consistencyReport.totalCollected)}
+                </p>
+              </div>
+              <div className="rounded-xl bg-gray-50 p-3 border border-gray-100">
+                <p className="text-gray-500 text-xs font-medium">Dist. remaining</p>
+                <p className="text-lg font-black text-gray-900">
+                  {formatINR(consistencyReport.remainingDistribution)}
+                </p>
+              </div>
+            </div>
+
+            {consistencyReport.balanceWarnings.length > 0 ? (
+              <ul className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+                {consistencyReport.balanceWarnings.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                No balance or duplicate warnings for the selected month.
+              </p>
+            )}
+
+            <button
+              type="button"
+              disabled={cleaningLegacy}
+              onClick={handleConsolidateLegacyPayments}
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-slate-200 bg-slate-100 text-slate-800 font-bold text-sm hover:bg-slate-200 disabled:opacity-50"
+            >
+              {cleaningLegacy ? 'Consolidating...' : 'Consolidate duplicate payments'}
+            </button>
+            <p className="text-xs text-gray-500">
+              Removes legacy Firestore IDs (e.g. 2026-4-12) when a canonical doc exists. Backup data first.
+            </p>
+          </div>
+        </div>
+
         {/* Danger Zone */}
         <div className="mt-6">
           <div className="bg-gradient-to-br from-red-600 to-red-800 rounded-2xl p-6 shadow-xl border border-red-700">
@@ -683,9 +825,9 @@ export function SettingsPage() {
                       </div>
                     </div>
 
-                    {reset.lastSentAt && (
+                    {reset.lastSentAt && !canResendOtp && (
                       <p className="text-xs text-gray-500 mt-2">
-                        Resend OTP available after 30 seconds.
+                        Resend OTP in {Math.ceil(otpCooldownRemainingMs / 1000)}s
                       </p>
                     )}
                   </div>

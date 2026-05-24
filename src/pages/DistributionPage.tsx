@@ -1,100 +1,110 @@
-import { useState } from 'react';
-import { useChitFund } from '../context/ChitFundContext';
+import { useEffect, useState } from 'react';
+import { ChitFundError, useChitFund } from '../context/ChitFundContext';
 import { formatINR } from '@/lib/utils';
 import { MONTHS } from '@/types';
 import { HandCoins, Plus, Wallet, TrendingUp, Users, ChevronDown, ArrowUpRight, ArrowDownRight, Trash2, AlertTriangle } from 'lucide-react';
+import { toast } from 'sonner';
 
 export function DistributionPage() {
-  const { state, getTotalCollectedForMonth, addDistribution, deleteDistribution } = useChitFund();
+  const {
+    state,
+    setSelectedMonthYear,
+    getTotalCollectedForMonth,
+    getRemainingDistributionForMonth,
+    addDistribution,
+    deleteDistribution,
+    hasMemberDistribution,
+  } = useChitFund();
 
-  const [selectedMonth, setSelectedMonth] = useState(
-    new Date().getMonth() + 1
-  );
+  const selectedMonth = state.selectedMonth;
+  const selectedYear = state.selectedYear;
 
-  const [selectedYear, setSelectedYear] = useState(
-    new Date().getFullYear()
-  );
-
-  const totalCollected = getTotalCollectedForMonth(
-    selectedMonth,
-    selectedYear
-  );
+  const totalCollected = getTotalCollectedForMonth(selectedMonth, selectedYear);
+  const remaining = getRemainingDistributionForMonth(selectedMonth, selectedYear);
 
   const monthDistributions = state.distributions.filter(
-    (d) =>
-      d.month === selectedMonth && d.year === selectedYear
+    (d) => d.month === selectedMonth && d.year === selectedYear,
   );
 
   const [showForm, setShowForm] = useState(false);
   const [selectedMember, setSelectedMember] = useState('');
-  const [amount, setAmount] = useState(String(totalCollected));
+  const [amount, setAmount] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const saveDistribution =
-  async () => {
+  useEffect(() => {
+    setAmount(String(Math.max(0, Math.round(remaining))));
+  }, [selectedMonth, selectedYear, remaining]);
 
-  if (
-    !selectedMember ||
-    !amount
-  ) return;
+  const currentYear = new Date().getFullYear();
+  const minYear = Math.min(2024, state.settings.startYear, currentYear - 2);
+  const maxYear = Math.max(currentYear + 5, state.settings.startYear + 5);
+  const years: number[] = [];
+  for (let y = minYear; y <= maxYear; y += 1) years.push(y);
 
-  const member =
-    state.members.find(
-      (m) =>
-        m.id ===
-        selectedMember
-    );
+  const saveDistribution = async () => {
+    if (!selectedMember || !amount || submitting) return;
 
-  if (!member) return;
+    const member = state.members.find((m) => m.id === selectedMember);
+    if (!member) return;
 
-  await addDistribution(
-    member.id,
-    selectedMonth,
-    selectedYear,
-    Number(amount),
-  );
+    const loanAmount = Number(amount);
+    if (!Number.isFinite(loanAmount) || loanAmount <= 0) {
+      toast.error('Enter a valid loan amount');
+      return;
+    }
 
-  alert(
-    'Distribution saved'
-  );
+    if (hasMemberDistribution(member.id, selectedMonth, selectedYear)) {
+      toast.error('This member already received a loan this month');
+      return;
+    }
 
-  setShowForm(false);
+    if (loanAmount > remaining) {
+      toast.error(`Cannot exceed remaining balance of ${formatINR(remaining)}`);
+      return;
+    }
 
-  setSelectedMember('');
+    setSubmitting(true);
+    try {
+      await addDistribution(member.id, selectedMonth, selectedYear, loanAmount);
+      toast.success('Distribution saved');
+      setShowForm(false);
+      setSelectedMember('');
+    } catch (error) {
+      const message =
+        error instanceof ChitFundError
+          ? error.message
+          : 'Could not save distribution';
+      toast.error(message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-  setAmount(
-    String(
-      totalCollected
-    )
-  );
-}
-  const handleGiveLoan =
-  async (
-    e: React.FormEvent
-  ) => {
-
+  const handleGiveLoan = async (e: React.FormEvent) => {
     e.preventDefault();
-
     await saveDistribution();
-
-    setShowForm(false);
-
-    setSelectedMember('');
   };
 
   const handleDeleteDistribution = async (distributionId: string) => {
     try {
       await deleteDistribution(distributionId);
       setDeleteConfirm(null);
+      toast.success('Distribution removed');
     } catch (error) {
       console.error('Error deleting distribution:', error);
-      alert('Error deleting distribution. Please try again.');
+      toast.error('Error deleting distribution. Please try again.');
     }
   };
 
   const totalDistributed = monthDistributions.reduce((sum, d) => sum + d.amount, 0);
-  const remaining = totalCollected - totalDistributed;
   const distributionRate = totalCollected > 0 ? Math.round((totalDistributed / totalCollected) * 100) : 0;
+
+  const membersAvailableForLoan = [...state.members]
+    .sort((a, b) => parseInt(a.id) - parseInt(b.id))
+    .filter(
+      (m) => !hasMemberDistribution(m.id, selectedMonth, selectedYear),
+    );
 
   return (
     <div className="pt-16 lg:pt-0 min-h-screen bg-gray-50">
@@ -122,7 +132,7 @@ export function DistributionPage() {
               <div className="relative">
                 <select
                   value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                  onChange={(e) => setSelectedMonthYear(Number(e.target.value), selectedYear)}
                   className="appearance-none bg-white border border-gray-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-gray-700 shadow-sm hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200"
                 >
                   {MONTHS.map((month, index) => (
@@ -134,14 +144,15 @@ export function DistributionPage() {
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
               </div>
 
-              <input
-                type="number"
+              <select
                 value={selectedYear}
-                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                onChange={(e) => setSelectedMonthYear(selectedMonth, Number(e.target.value))}
                 className="px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 shadow-sm hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200"
-                min="2020"
-                max="2030"
-              />
+              >
+                {years.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
@@ -172,7 +183,11 @@ export function DistributionPage() {
             <p className="text-emerald-200 text-xs mt-2">{distributionRate}% of collected</p>
           </div>
 
-          <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-6 shadow-xl text-white">
+          <div className={`rounded-2xl p-6 shadow-xl text-white ${
+            remaining < 0
+              ? 'bg-gradient-to-br from-red-500 to-red-700'
+              : 'bg-gradient-to-br from-amber-500 to-orange-600'
+          }`}>
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
                 <TrendingUp className="w-6 h-6 text-white" />
@@ -181,7 +196,9 @@ export function DistributionPage() {
             </div>
             <p className="text-amber-100 text-sm font-medium mb-1">Remaining Balance</p>
             <p className="text-3xl font-black text-white">{formatINR(remaining)}</p>
-            <p className="text-amber-200 text-xs mt-2">Available for distribution</p>
+            <p className="text-amber-200 text-xs mt-2">
+              {remaining < 0 ? 'Over-distributed — review entries' : 'Available for distribution'}
+            </p>
           </div>
         </div>
       </div>
@@ -199,8 +216,10 @@ export function DistributionPage() {
                 </div>
                 {!showForm && (
                   <button
+                    type="button"
                     onClick={() => setShowForm(true)}
-                    className="w-10 h-10 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center hover:bg-white/30 transition-colors"
+                    disabled={remaining <= 0}
+                    className="w-10 h-10 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center hover:bg-white/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Plus className="w-5 h-5 text-white" />
                   </button>
@@ -220,7 +239,7 @@ export function DistributionPage() {
                       required
                     >
                       <option value="">Choose a member</option>
-                      {[...state.members].sort((a, b) => parseInt(a.id) - parseInt(b.id)).map(m => (
+                      {membersAvailableForLoan.map(m => (
                         <option key={m.id} value={m.id}>{m.id} - {m.name}</option>
                       ))}
                     </select>
@@ -237,8 +256,12 @@ export function DistributionPage() {
                         className="w-full pl-8 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200"
                         required
                         min="1"
+                        max={Math.max(0, remaining)}
                       />
                     </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Max available: {formatINR(Math.max(0, remaining))}
+                    </p>
                   </div>
 
                   <div className="flex gap-3 pt-2">
@@ -251,9 +274,10 @@ export function DistributionPage() {
                     </button>
                     <button
                       type="submit"
-                      className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl text-sm font-semibold hover:from-orange-600 hover:to-red-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+                      disabled={submitting || remaining <= 0}
+                      className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl text-sm font-semibold hover:from-orange-600 hover:to-red-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Give Loan
+                      {submitting ? 'Saving...' : 'Give Loan'}
                     </button>
                   </div>
                 </form>
@@ -325,6 +349,7 @@ export function DistributionPage() {
                           </td>
                           <td className="px-6 py-4 text-center">
                             <button
+                              type="button"
                               onClick={() => setDeleteConfirm(dist.id)}
                               className="group relative p-2 bg-red-50 rounded-lg hover:bg-red-100 transition-colors duration-200"
                               title="Delete distribution"
@@ -359,18 +384,20 @@ export function DistributionPage() {
 
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
               <p className="text-sm text-amber-800">
-                <strong>Warning:</strong> This will remove the loan amount from the member's balance and cannot be undone.
+                <strong>Warning:</strong> This will remove the loan amount from the member&apos;s balance and cannot be undone.
               </p>
             </div>
 
             <div className="flex gap-3">
               <button
+                type="button"
                 onClick={() => setDeleteConfirm(null)}
                 className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-colors duration-200"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={() => handleDeleteDistribution(deleteConfirm)}
                 className="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl text-sm font-semibold hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-lg hover:shadow-xl"
               >

@@ -4,7 +4,16 @@ import { MONTHS } from '@/types';
 import { Calendar, TrendingUp, Users, CheckCircle, XCircle, DollarSign } from 'lucide-react';
 
 export function MonthlySummaryPage() {
-  const { state, setSelectedMonthYear } = useChitFund();
+  const {
+    state,
+    setSelectedMonthYear,
+    getMonthPayments,
+    getTotalCollectedForMonth,
+    getPaidCountForMonth,
+    getPendingCountForMonth,
+    hasMemberPaid,
+  } = useChitFund();
+
   const currentYear = new Date().getFullYear();
   const selectedMonth = state.selectedMonth;
   const selectedYear = state.selectedYear;
@@ -14,19 +23,16 @@ export function MonthlySummaryPage() {
   const years: number[] = [];
   for (let y = minYear; y <= maxYear; y += 1) years.push(y);
 
-  const payments = state.payments.filter(p => p.month === selectedMonth && p.year === selectedYear);
-  const paidMemberIds = new Set(payments.map(p => p.memberId));
+  const payments = getMonthPayments(selectedMonth, selectedYear);
+  const paidMembersCount = getPaidCountForMonth(selectedMonth, selectedYear);
+  const pendingMembersCount = getPendingCountForMonth(selectedMonth, selectedYear);
 
   const totals = {
     contribution: payments.reduce((s, p) => s + p.contribution, 0),
     principal: payments.reduce((s, p) => s + p.principalPaid, 0),
     interest: payments.reduce((s, p) => s + p.interest, 0),
-    total: payments.reduce((s, p) => s + p.totalPaid, 0),
+    total: getTotalCollectedForMonth(selectedMonth, selectedYear),
   };
-
-  const uniquePaidMemberIds = new Set(payments.map((p) => p.memberId));
-  const paidMembersCount = uniquePaidMemberIds.size;
-  const pendingMembersCount = Math.max(0, state.members.length - paidMembersCount);
 
   const paidPercentage =
     state.members.length > 0
@@ -65,7 +71,7 @@ export function MonthlySummaryPage() {
               <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center">
                 <CheckCircle className="w-5 h-5 text-white" />
               </div>
-              <span className="text-2xl font-black text-emerald-900">{payments.length}</span>
+              <span className="text-2xl font-black text-emerald-900">{paidMembersCount}</span>
             </div>
             <p className="text-sm font-medium text-emerald-800">Members Paid</p>
             <p className="text-xs text-emerald-600 mt-1">{paidPercentage}% completion rate</p>
@@ -76,7 +82,7 @@ export function MonthlySummaryPage() {
               <div className="w-10 h-10 bg-rose-500 rounded-xl flex items-center justify-center">
                 <XCircle className="w-5 h-5 text-white" />
               </div>
-              <span className="text-2xl font-black text-rose-900">{state.members.length - payments.length}</span>
+              <span className="text-2xl font-black text-rose-900">{pendingMembersCount}</span>
             </div>
             <p className="text-sm font-medium text-rose-800">Members Pending</p>
             <p className="text-xs text-rose-600 mt-1">{pendingMembersCount} pending</p>
@@ -172,7 +178,7 @@ export function MonthlySummaryPage() {
             <tbody className="divide-y divide-gray-100">
               {[...state.members].sort((a, b) => parseInt(a.id) - parseInt(b.id)).map((member, index) => {
                 const payment = payments.find(p => p.memberId === member.id);
-                const isPaid = paidMemberIds.has(member.id);
+                const isPaid = hasMemberPaid(member.id, selectedMonth, selectedYear);
 
                 return (
                   <tr 
@@ -211,7 +217,7 @@ export function MonthlySummaryPage() {
                 <td className="px-6 py-4 text-sm text-blue-600 text-right font-black">{formatINR(totals.total)}</td>
                 <td className="px-6 py-4 text-center">
                   <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-bold">
-                    {payments.length} / {state.members.length}
+                    {paidMembersCount} / {state.members.length}
                   </span>
                 </td>
               </tr>

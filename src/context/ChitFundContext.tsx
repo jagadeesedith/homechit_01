@@ -16,7 +16,18 @@ import {
 } from "firebase/firestore";
 
 import type { Distribution, Member, MonthlyPayment, Settings } from "@/types";
-import { generateId } from "@/lib/utils";
+import { distributionDocId, paymentDocId } from "@/lib/financialIds";
+import {
+  dedupePaymentsByMember,
+  getPaidMemberIds,
+  normalizePaymentsCatalog,
+  sumTotalPaid,
+} from "@/lib/monthPayments";
+import { getMonthAmount } from "@/lib/payment";
+import {
+  calculatePayment,
+  resolveOutstandingBalance,
+} from "@/lib/paymentMath";
 import { db, auth } from "@/lib/firebase";
 
 interface State {
@@ -63,9 +74,15 @@ function nextNumericMemberId(existing: Member[]): string {
   return String(maxId + 1);
 }
 
-function paymentDocId(memberId: string, month: number, year: number): string {
-  // deterministic id prevents duplicates across refresh/import
-  return `${year}-${String(month).padStart(2, "0")}-${memberId}`;
+function upsertPayments(
+  existing: MonthlyPayment[],
+  incoming: MonthlyPayment[],
+): MonthlyPayment[] {
+  const byId = new Map(existing.map((p) => [p.id, p]));
+  for (const payment of incoming) {
+    byId.set(payment.id, payment);
+  }
+  return Array.from(byId.values());
 }
 
 function reducer(state: State, action: Action): State {
@@ -99,7 +116,9 @@ function reducer(state: State, action: Action): State {
     }
 
     case "RECORD_PAYMENT": {
-      const newPayments = [...state.payments, action.payload.payment];
+      const newPayments = upsertPayments(state.payments, [
+        action.payload.payment,
+      ]);
       const updatedMembers = state.members.map((m) =>
         m.id === action.payload.updatedMember.id
           ? action.payload.updatedMember
@@ -109,13 +128,20 @@ function reducer(state: State, action: Action): State {
     }
 
     case "ADD_DISTRIBUTION": {
-      const newDistributions = [...state.distributions, action.payload];
+      const exists = state.distributions.some(
+        (d) => d.id === action.payload.id,
+      );
+      const newDistributions = exists
+        ? state.distributions.map((d) =>
+            d.id === action.payload.id ? action.payload : d,
+          )
+        : [...state.distributions, action.payload];
       return { ...state, distributions: newDistributions };
     }
 
     case "DELETE_DISTRIBUTION": {
       const newDistributions = state.distributions.filter(
-        (d) => d.id !== action.payload
+        (d) => d.id !== action.payload,
       );
       return { ...state, distributions: newDistributions };
     }
@@ -125,12 +151,19 @@ function reducer(state: State, action: Action): State {
     }
 
     case "MARK_ALL_PAID": {
-      const updatedPayments = [...state.payments, ...action.payload];
+      const updatedPayments = upsertPayments(state.payments, action.payload);
       return { ...state, payments: updatedPayments };
     }
 
     default:
       return state;
+  }
+}
+
+export class ChitFundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ChitFundError";
   }
 }
 
@@ -168,8 +201,20 @@ interface ContextValue {
   getMemberPayments: (memberId: string) => MonthlyPayment[];
   getMonthPayments: (month: number, year: number) => MonthlyPayment[];
   getMemberBalance: (memberId: string) => number;
+  getMemberOutstandingBalance: (memberId: string) => number;
   getTotalCollectedForMonth: (month: number, year: number) => number;
+  getPaidCountForMonth: (month: number, year: number) => number;
+  getPendingCountForMonth: (month: number, year: number) => number;
+  getRemainingDistributionForMonth: (
+    month: number,
+    year: number,
+  ) => number;
   hasMemberPaid: (memberId: string, month: number, year: number) => boolean;
+  hasMemberDistribution: (
+    memberId: string,
+    month: number,
+    year: number,
+  ) => boolean;
   getContributionAmount: (month: number, year: number) => number;
 }
 
@@ -185,11 +230,79 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
     selectedYear: defaultSettings.startYear,
   });
 
+  const getMemberPayments = (memberId: string) => {
+    return state.payments
+      .filter((p) => p.memberId === memberId)
+      .sort((a, b) => {
+        if (a.year !== b.year) return a.year - b.year;
+        return a.month - b.month;
+      });
+  };
+
+  const getMemberOutstandingBalance = (memberId: string): number => {
+    const member = state.members.find((m) => m.id === memberId);
+    const payments = getMemberPayments(memberId);
+    return resolveOutstandingBalance(member, payments);
+  };
+
+  const getMonthPayments = (month: number, year: number) => {
+    const monthPayments = state.payments.filter(
+      (p) => p.month === month && p.year === year,
+    );
+    return dedupePaymentsByMember(monthPayments);
+  };
+
+  const getTotalCollectedForMonth = (month: number, year: number) => {
+    return sumTotalPaid(state.payments, month, year);
+  };
+
+  const getPaidCountForMonth = (month: number, year: number) => {
+    return getPaidMemberIds(state.payments, month, year).size;
+  };
+
+  const getPendingCountForMonth = (month: number, year: number) => {
+    return Math.max(0, state.members.length - getPaidCountForMonth(month, year));
+  };
+
+  const getTotalDistributedForMonth = (month: number, year: number) => {
+    return state.distributions
+      .filter((d) => d.month === month && d.year === year)
+      .reduce((sum, d) => sum + d.amount, 0);
+  };
+
+  const getRemainingDistributionForMonth = (month: number, year: number) => {
+    return (
+      getTotalCollectedForMonth(month, year) -
+      getTotalDistributedForMonth(month, year)
+    );
+  };
+
+  const hasMemberPaid = (memberId: string, month: number, year: number) => {
+    return getPaidMemberIds(state.payments, month, year).has(memberId);
+  };
+
+  const hasMemberDistribution = (
+    memberId: string,
+    month: number,
+    year: number,
+  ) => {
+    return state.distributions.some(
+      (d) =>
+        d.memberId === memberId && d.month === month && d.year === year,
+    );
+  };
+
+  const getContributionAmount = (month: number, year: number) => {
+    return getMonthAmount(month, year, state.settings);
+  };
+
   const reloadFromFirestore = async () => {
     const user = auth.currentUser;
     if (!user) return;
 
     const userId = user.uid;
+    const preserveMonth = state.selectedMonth;
+    const preserveYear = state.selectedYear;
 
     const [
       membersSnapshot,
@@ -208,15 +321,18 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
       ...(d.data() as Omit<Member, "id">),
     }));
 
-    const payments: MonthlyPayment[] = paymentsSnapshot.docs.map((d) => ({
+    const rawPayments: MonthlyPayment[] = paymentsSnapshot.docs.map((d) => ({
       id: d.id,
       ...(d.data() as Omit<MonthlyPayment, "id">),
     }));
+    const payments = normalizePaymentsCatalog(rawPayments);
 
-    const distributions: Distribution[] = distributionsSnapshot.docs.map((d) => ({
-      id: d.id,
-      ...(d.data() as Omit<Distribution, "id">),
-    }));
+    const distributions: Distribution[] = distributionsSnapshot.docs.map(
+      (d) => ({
+        id: d.id,
+        ...(d.data() as Omit<Distribution, "id">),
+      }),
+    );
 
     const settings: Settings = settingsSnap.exists()
       ? ({ ...(settingsSnap.data() as Settings) } satisfies Settings)
@@ -229,8 +345,8 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
         payments,
         distributions,
         settings,
-        selectedMonth: settings.startMonth,
-        selectedYear: settings.startYear,
+        selectedMonth: preserveMonth || settings.startMonth,
+        selectedYear: preserveYear || settings.startYear,
       },
     });
   };
@@ -260,7 +376,8 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
     });
 
     return () => unsubscribe();
-     }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const setSelectedMonthYear = (month: number, year: number) => {
     dispatch({ type: "SET_SELECTED_MONTH_YEAR", payload: { month, year } });
@@ -273,6 +390,27 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
     const user = auth.currentUser;
     if (!user) return;
 
+    const membersSnapshot = await getDocs(
+      collection(db, "users", user.uid, "members"),
+    );
+    const existingMembers: Member[] = membersSnapshot.docs.map((d) => ({
+      id: d.id,
+      ...(d.data() as Omit<Member, "id">),
+    }));
+
+    let memberId = nextNumericMemberId(existingMembers);
+    while (existingMembers.some((m) => m.id === memberId)) {
+      memberId = String(Number(memberId) + 1);
+    }
+
+    const memberRef = doc(db, "users", user.uid, "members", memberId);
+    const existingDoc = await getDoc(memberRef);
+    if (existingDoc.exists()) {
+      throw new ChitFundError(
+        `Member ID ${memberId} already exists. Please try again.`,
+      );
+    }
+
     const newMember = {
       name: memberData.name,
       phone: memberData.phone,
@@ -282,19 +420,13 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
       notes: "",
     };
 
-    const memberId = nextNumericMemberId(state.members);
-
-    await setDoc(
-      doc(db, "users", user.uid, "members", memberId),
-      newMember,
-      { merge: true },
-    );
+    await setDoc(memberRef, newMember, { merge: true });
 
     dispatch({
       type: "SET_STATE",
       payload: {
         members: [
-          ...state.members,
+          ...existingMembers,
           {
             id: memberId,
             ...(newMember as Omit<Member, "id">),
@@ -335,36 +467,33 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
     const member = state.members.find((m) => m.id === memberId);
     if (!member) return null;
 
-    const isFirstMonth =
-      month === state.settings.startMonth &&
-      year === state.settings.startYear;
+    if (hasMemberPaid(memberId, month, year)) {
+      throw new ChitFundError("Payment already recorded for this month.");
+    }
 
-    const amount = isFirstMonth
-      ? state.settings.firstMonthAmount
-      : state.settings.monthlyAmount;
-
-    const interest = (member.balance * state.settings.interestRate) / 100;
-    const totalPaid = amount + principalPaid + interest;
-    const newBalance = member.balance - principalPaid;
+    const memberPayments = getMemberPayments(memberId);
+    const outstanding = resolveOutstandingBalance(member, memberPayments);
+    const contribution = getContributionAmount(month, year);
+    const calc = calculatePayment({
+      outstanding,
+      contribution,
+      principalPaid,
+      interestRate: state.settings.interestRate,
+    });
 
     const payment: MonthlyPayment = {
       id: paymentDocId(memberId, month, year),
       memberId,
       month,
       year,
-      previousBalance: member.balance,
-      contribution: amount,
-      principalPaid,
-      interest,
-      totalPaid,
-      newBalance,
+      ...calc,
       givenMoney: 0,
       paidAt: new Date().toISOString(),
     };
 
     const updatedMember: Member = {
       ...member,
-      balance: Math.max(0, newBalance),
+      balance: calc.newBalance,
     };
 
     const user = auth.currentUser;
@@ -390,52 +519,49 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
     return payment;
   };
 
+  const buildPaymentForMember = (
+    member: Member,
+    month: number,
+    year: number,
+  ): MonthlyPayment => {
+    const memberPayments = getMemberPayments(member.id);
+    const outstanding = resolveOutstandingBalance(member, memberPayments);
+    const contribution = getContributionAmount(month, year);
+    const calc = calculatePayment({
+      outstanding,
+      contribution,
+      principalPaid: 0,
+      interestRate: state.settings.interestRate,
+    });
+
+    return {
+      id: paymentDocId(member.id, month, year),
+      memberId: member.id,
+      month,
+      year,
+      ...calc,
+      givenMoney: 0,
+      paidAt: new Date().toISOString(),
+    };
+  };
+
   const markAllPaidForMonth = async (month: number, year: number) => {
     const user = auth.currentUser;
     if (!user) return;
 
-    const alreadyPaid = new Set(
-      state.payments
-        .filter((p) => p.month === month && p.year === year)
-        .map((p) => p.memberId),
-    );
+    const alreadyPaid = getPaidMemberIds(state.payments, month, year);
 
     const payments: MonthlyPayment[] = [...state.members]
-      .sort((a, b) => parseInt(a.id) - parseInt(b.id))
+      .sort((a, b) => parseInt(a.id, 10) - parseInt(b.id, 10))
       .filter((m) => !alreadyPaid.has(m.id))
-      .map((member) => {
-      const isFirstMonth =
-        month === state.settings.startMonth &&
-        year === state.settings.startYear;
-
-      const contribution = isFirstMonth
-        ? state.settings.firstMonthAmount
-        : state.settings.monthlyAmount;
-
-      const interest = (member.balance * state.settings.interestRate) / 100;
-      const principalPaid = 0;
-      const totalPaid = contribution + principalPaid + interest;
-
-      return {
-        id: paymentDocId(member.id, month, year),
-        memberId: member.id,
-        month,
-        year,
-        previousBalance: member.balance,
-        contribution,
-        principalPaid,
-        interest,
-        totalPaid,
-        newBalance: member.balance,
-        givenMoney: 0,
-        paidAt: new Date().toISOString(),
-      };
-    });
+      .map((member) => buildPaymentForMember(member, month, year));
 
     for (let i = 0; i < payments.length; i += 450) {
       const batch = writeBatch(db);
       for (const p of payments.slice(i, i + 450)) {
-        batch.set(doc(db, "users", user.uid, "payments", p.id), p, { merge: true });
+        batch.set(doc(db, "users", user.uid, "payments", p.id), p, {
+          merge: true,
+        });
       }
       await batch.commit();
     }
@@ -454,43 +580,14 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
     if (!user || memberIds.length === 0) return 0;
 
     const selectedIds = new Set(memberIds);
-    const alreadyPaid = new Set(
-      state.payments
-        .filter((p) => p.month === month && p.year === year)
-        .map((p) => p.memberId),
-    );
+    const alreadyPaid = getPaidMemberIds(state.payments, month, year);
 
     const payments: MonthlyPayment[] = [...state.members]
-      .sort((a, b) => parseInt(a.id) - parseInt(b.id))
-      .filter((member) => selectedIds.has(member.id) && !alreadyPaid.has(member.id))
-      .map((member) => {
-        const isFirstMonth =
-          month === state.settings.startMonth &&
-          year === state.settings.startYear;
-
-        const contribution = isFirstMonth
-          ? state.settings.firstMonthAmount
-          : state.settings.monthlyAmount;
-
-        const principalPaid = 0;
-        const interest = (member.balance * state.settings.interestRate) / 100;
-        const totalPaid = contribution + principalPaid + interest;
-
-        return {
-          id: paymentDocId(member.id, month, year),
-          memberId: member.id,
-          month,
-          year,
-          previousBalance: member.balance,
-          contribution,
-          principalPaid,
-          interest,
-          totalPaid,
-          newBalance: member.balance,
-          givenMoney: 0,
-          paidAt: new Date().toISOString(),
-        };
-      });
+      .sort((a, b) => parseInt(a.id, 10) - parseInt(b.id, 10))
+      .filter(
+        (member) => selectedIds.has(member.id) && !alreadyPaid.has(member.id),
+      )
+      .map((member) => buildPaymentForMember(member, month, year));
 
     for (let i = 0; i < payments.length; i += 450) {
       const batch = writeBatch(db);
@@ -518,17 +615,34 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
     const user = auth.currentUser;
     if (!user) return;
 
+    if (amount <= 0) {
+      throw new ChitFundError("Distribution amount must be greater than zero.");
+    }
+
+    if (hasMemberDistribution(memberId, month, year)) {
+      throw new ChitFundError(
+        "This member already received a loan for this month.",
+      );
+    }
+
+    const remaining = getRemainingDistributionForMonth(month, year);
+    if (amount > remaining) {
+      throw new ChitFundError(
+        `Cannot distribute ${amount}. Only ${Math.max(0, remaining)} remaining for this month.`,
+      );
+    }
+
+    const member = state.members.find((m) => m.id === memberId);
+    if (!member) return;
+
     const distribution: Distribution = {
-      id: generateId(),
+      id: distributionDocId(memberId, month, year),
       memberId,
       month,
       year,
       amount,
       givenAt: new Date().toISOString(),
     };
-
-    const member = state.members.find((m) => m.id === memberId);
-    if (!member) return;
 
     const updatedMember: Member = {
       ...member,
@@ -556,22 +670,21 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
     const user = auth.currentUser;
     if (!user) return;
 
-    const distribution = state.distributions.find(d => d.id === distributionId);
+    const distribution = state.distributions.find(
+      (d) => d.id === distributionId,
+    );
     if (!distribution) return;
 
     const member = state.members.find((m) => m.id === distribution.memberId);
     if (!member) return;
 
-    // Update member balance (subtract the distributed amount)
     const updatedMember: Member = {
       ...member,
       balance: Math.max(0, member.balance - distribution.amount),
     };
 
     const batch = writeBatch(db);
-    // Delete the distribution document
     batch.delete(doc(db, "users", user.uid, "distributions", distributionId));
-    // Update the member document
     batch.set(
       doc(db, "users", user.uid, "members", updatedMember.id),
       updatedMember,
@@ -587,52 +700,15 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
     const user = auth.currentUser;
     if (!user) return;
 
-    await setDoc(
-      doc(db, "users", user.uid, "settings", "chit"),
-      settings,
-      { merge: true },
-    );
+    await setDoc(doc(db, "users", user.uid, "settings", "chit"), settings, {
+      merge: true,
+    });
 
     dispatch({ type: "UPDATE_SETTINGS", payload: settings });
   };
 
-  const getMemberPayments = (memberId: string) => {
-    return state.payments
-      .filter((p) => p.memberId === memberId)
-      .sort((a, b) => {
-        if (a.year !== b.year) return a.year - b.year;
-        return a.month - b.month;
-      });
-  };
-
-  const getMonthPayments = (month: number, year: number) => {
-    return state.payments.filter((p) => p.month === month && p.year === year);
-  };
-
   const getMemberBalance = (memberId: string) => {
-    const member = state.members.find((m) => m.id === memberId);
-    return member?.balance ?? 0;
-  };
-
-  const getTotalCollectedForMonth = (month: number, year: number) => {
-    const totalCollected = state.payments
-      .filter((p) => p.month === month && p.year === year)
-      .reduce((sum, p) => sum + (p.totalPaid || 0), 0);
-
-    return totalCollected;
-  };
-
-  const hasMemberPaid = (memberId: string, month: number, year: number) => {
-    return state.payments.some(
-      (p) => p.memberId === memberId && p.month === month && p.year === year,
-    );
-  };
-
-  const getContributionAmount = (month: number, year: number) => {
-    const isFirstMonth =
-      month === state.settings.startMonth && year === state.settings.startYear;
-
-    return isFirstMonth ? state.settings.firstMonthAmount : state.settings.monthlyAmount;
+    return getMemberOutstandingBalance(memberId);
   };
 
   return (
@@ -654,8 +730,13 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
         getMemberPayments,
         getMonthPayments,
         getMemberBalance,
+        getMemberOutstandingBalance,
         getTotalCollectedForMonth,
+        getPaidCountForMonth,
+        getPendingCountForMonth,
+        getRemainingDistributionForMonth,
         hasMemberPaid,
+        hasMemberDistribution,
         getContributionAmount,
       }}
     >
@@ -670,4 +751,3 @@ export function useChitFund(): ContextValue {
   if (!ctx) throw new Error("useChitFund must be used within ChitFundProvider");
   return ctx;
 }
-
