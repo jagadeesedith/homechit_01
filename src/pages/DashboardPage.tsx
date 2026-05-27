@@ -246,6 +246,14 @@ export function DashboardPage() {
             </div>
 
             {/* Mark All Paid */}
+            <button className="admin-button admin-press bg-gray-600 px-6 py-3 text-white shadow-[0_10px_24px_rgba(75,85,99,0.18)] hover:bg-gray-700">
+            <a
+  href="/apk/homechit.apk"
+  download
+  className="admin-button admin-press bg-blue-600 px-6 py-3 text-white shadow-[0_10px_24px_rgba(37,99,235,0.18)] hover:bg-blue-700"
+>
+  📱 Install App
+</a></button>
             <button
               onClick={handleMarkAllPaid}
               className="admin-button admin-press bg-emerald-600 px-6 py-3 text-white shadow-[0_10px_24px_rgba(5,150,105,0.18)] hover:bg-emerald-700"
