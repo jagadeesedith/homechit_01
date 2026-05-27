@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "548614997248",
+    "project_id": "homechit-f3b57",
+    "storage_bucket": "homechit-f3b57.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:548614997248:android:c9c6884e17ab3a69745fe5",
+        "android_client_info": {
+          "package_name": "com.homechit.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "548614997248-h5j1mppoivgls4b3uh416k7kkl44rm2s.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAX6IqIEbZ3pPYDvdp_9-AB8_TsJoUz-zc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "548614997248-h5j1mppoivgls4b3uh416k7kkl44rm2s.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
