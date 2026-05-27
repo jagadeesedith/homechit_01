@@ -8,7 +8,6 @@ export function MonthlySummaryPage() {
     state,
     setSelectedMonthYear,
     getMonthPayments,
-    getTotalCollectedForMonth,
     getPaidCountForMonth,
     getPendingCountForMonth,
     hasMemberPaid,
@@ -28,11 +27,18 @@ export function MonthlySummaryPage() {
   const pendingMembersCount = getPendingCountForMonth(selectedMonth, selectedYear);
 
   const totals = {
-    contribution: payments.reduce((s, p) => s + p.contribution, 0),
-    principal: payments.reduce((s, p) => s + p.principalPaid, 0),
-    interest: payments.reduce((s, p) => s + p.interest, 0),
-    total: getTotalCollectedForMonth(selectedMonth, selectedYear),
-  };
+  contribution: payments.reduce((s, p) => s + p.contribution, 0),
+  principal: payments.reduce((s, p) => s + p.principalPaid, 0),
+  interest: payments.reduce((s, p) => s + p.interest, 0),
+  total: payments.reduce(
+    (s, p) =>
+      s +
+      p.contribution +
+      p.principalPaid +
+      p.interest,
+    0
+  ),
+};
 
   const paidPercentage =
     state.members.length > 0
@@ -190,7 +196,15 @@ export function MonthlySummaryPage() {
                     <td className="px-6 py-4 text-sm text-gray-700 text-right">{payment ? formatINR(payment.contribution) : '-'}</td>
                     <td className="px-6 py-4 text-sm text-gray-700 text-right">{payment ? formatINR(payment.principalPaid) : '-'}</td>
                     <td className="px-6 py-4 text-sm text-gray-700 text-right">{payment ? formatINR(payment.interest) : '-'}</td>
-                    <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">{payment ? formatINR(payment.totalPaid) : '-'}</td>
+                    <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">{
+  payment
+    ? formatINR(
+        payment.contribution +
+        payment.principalPaid +
+        payment.interest
+      )
+    : '-'
+}</td>
                     <td className="px-6 py-4 text-center">
                       {isPaid ? (
                         <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold">

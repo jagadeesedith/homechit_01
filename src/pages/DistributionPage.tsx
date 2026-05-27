@@ -9,22 +9,37 @@ export function DistributionPage() {
   const {
     state,
     setSelectedMonthYear,
-    getTotalCollectedForMonth,
-    getRemainingDistributionForMonth,
     addDistribution,
     deleteDistribution,
     hasMemberDistribution,
   } = useChitFund();
 
-  const selectedMonth = state.selectedMonth;
-  const selectedYear = state.selectedYear;
+ const selectedMonth = state.selectedMonth;
+const selectedYear = state.selectedYear;
 
-  const totalCollected = getTotalCollectedForMonth(selectedMonth, selectedYear);
-  const remaining = getRemainingDistributionForMonth(selectedMonth, selectedYear);
+const monthDistributions = state.distributions.filter(
+  (d) => d.month === selectedMonth && d.year === selectedYear,
+);
 
-  const monthDistributions = state.distributions.filter(
-    (d) => d.month === selectedMonth && d.year === selectedYear,
-  );
+const payments = state.payments.filter(
+  (p) => p.month === selectedMonth && p.year === selectedYear
+);
+
+const totalCollected = payments.reduce(
+  (sum, p) =>
+    sum +
+    p.contribution +
+    p.principalPaid +
+    p.interest,
+  0
+);
+
+const totalDistributed = monthDistributions.reduce(
+  (sum, d) => sum + d.amount,
+  0
+);
+
+const remaining = totalCollected - totalDistributed;
 
   const [showForm, setShowForm] = useState(false);
   const [selectedMember, setSelectedMember] = useState('');
@@ -97,7 +112,6 @@ export function DistributionPage() {
     }
   };
 
-  const totalDistributed = monthDistributions.reduce((sum, d) => sum + d.amount, 0);
   const distributionRate = totalCollected > 0 ? Math.round((totalDistributed / totalCollected) * 100) : 0;
 
   const membersAvailableForLoan = [...state.members]

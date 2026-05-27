@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">homechit</string>
+    <string name="title_activity_main">homechit</string>
+    <string name="package_name">com.homechit.app</string>
+    <string name="custom_url_scheme">com.homechit.app</string>
+</resources>
