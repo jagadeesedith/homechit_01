@@ -26,9 +26,18 @@ import {
 
 import { cn } from '@/lib/utils';
 
-const windowsDownloadUrl =
-'/homechit_0.1.0_x64-setup.exe';
+const windowsDownloadUrl = '/downloads/homechit-windows-latest.exe';
 const androidDownloadUrl = '/apk/homechit.apk';
+
+function triggerDownload(url: string) {
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', '');
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 
 type WhatNewFeature = { title: string; description?: string };
 type VersionNote = { version: string; releaseDate: string; downloadUrl: string };
@@ -410,8 +419,9 @@ export function DownloadCenterPage() {
                             : 'bg-sky-400/90 hover:bg-sky-400 text-black'
                         )}
                         onClick={() => {
-                          window.location.href = (card as any).downloadUrl;
+                          triggerDownload((card as any).downloadUrl);
                         }}
+
                       >
                         <Download className="h-4 w-4" />
                         {isAndroid ? 'Download APK' : 'Download for Windows'}
@@ -554,8 +564,9 @@ export function DownloadCenterPage() {
                       type="button"
                       className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-white/10 border border-white/15 px-4 py-3 text-sm font-black text-slate-100 hover:bg-white/15 transition active:scale-[0.99]"
                       onClick={() => {
-                        window.location.href = v.downloadUrl;
+                        triggerDownload(v.downloadUrl);
                       }}
+
                     >
                       <Download className="h-4 w-4" />
                       Download

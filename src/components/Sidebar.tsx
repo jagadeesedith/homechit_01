@@ -47,7 +47,13 @@ const navItems = [
     label: 'Settings',
     icon: Settings
   },
+  {
+    path: '/download',
+    label: 'Download Center',
+    icon: Coins
+  },
 ];
+
 
 export function Sidebar() {
   const location = useLocation();
