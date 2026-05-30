@@ -8,6 +8,7 @@ import { MemberHistoryPage } from '@/pages/MemberHistoryPage';
 import { DistributionPage } from '@/pages/DistributionPage';
 import { MemberListPage } from '@/pages/MemberListPage';
 import { SettingsPage } from '@/pages/SettingsPage';
+import { DownloadCenterPage } from '@/pages/DownloadCenterPage';
 import { Toaster } from '@/components/ui/sonner';
 
 export default function App() {
@@ -15,6 +16,7 @@ export default function App() {
     <ChitFundProvider>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/download" element={<DownloadCenterPage />} />
         <Route
           path="/"
           element={
@@ -79,3 +81,4 @@ export default function App() {
     </ChitFundProvider>
   );
 }
+

@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/hooks/useAuth';
+
 
 import { Coins } from 'lucide-react';
 
@@ -13,30 +13,21 @@ export function LoginPage() {
   const { googleLogin } =
     useAuth();
 
-  const navigate =
-    useNavigate();
 
-  const handleGoogleLogin =
-    async () => {
 
-      setError('');
+  const handleGoogleLogin = async () => {
 
-      const success =
-        await googleLogin();
+    setError('');
 
-      if (success) {
+    const success = await googleLogin();
 
-        navigate('/', {
-          replace: true
-        });
+    if (!success) {
+      setError('Google login failed');
+    }
+    // With redirect flow, the app will reload after Google login,
+    // and ProtectedRoute will navigate automatically.
+  }; 
 
-      } else {
-
-        setError(
-          'Google login failed'
-        );
-      }
-    };
 
   return (
 
