@@ -1,9 +1,11 @@
+import React from 'react';
 import { useChitFund } from '../context/ChitFundContext';
 import { formatINR } from '@/lib/utils';
 import { MONTHS } from '@/types';
 import { Calendar, TrendingUp, Users, CheckCircle, XCircle, DollarSign } from 'lucide-react';
 
 export function MonthlySummaryPage() {
+
   const {
     state,
     setSelectedMonthYear,
@@ -11,7 +13,10 @@ export function MonthlySummaryPage() {
     getPaidCountForMonth,
     getPendingCountForMonth,
     hasMemberPaid,
+    getContributionAmount,
+    applyContributionToAllMembersForMonth,
   } = useChitFund();
+
 
   const currentYear = new Date().getFullYear();
   const selectedMonth = state.selectedMonth;
@@ -45,10 +50,20 @@ export function MonthlySummaryPage() {
       ? Math.round((paidMembersCount / state.members.length) * 100)
       : 0;
 
+  const [contributionInput, setContributionInput] = React.useState<number>(
+    getContributionAmount(selectedMonth, selectedYear),
+  );
+  const [busyContribution, setBusyContribution] = React.useState(false);
+
+  React.useEffect(() => {
+    setContributionInput(getContributionAmount(selectedMonth, selectedYear));
+  }, [selectedMonth, selectedYear, getContributionAmount]);
+
   return (
     <div className="pt-16 lg:pt-0">
       {/* Header */}
       <div className="mb-8">
+
         <div className="flex items-center gap-3 mb-6">
           <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
             <Calendar className="w-6 h-6 text-white" />
@@ -153,8 +168,85 @@ export function MonthlySummaryPage() {
         </div>
       </div>
 
+      {/* Monthly Contribution Management */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden mb-6">
+        <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Monthly Contribution Management</h3>
+              <p className="text-sm text-gray-600">Update contribution amount and apply it to all members for the selected month</p>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <DollarSign className="w-4 h-4" />
+              <span>
+                {MONTHS[selectedMonth - 1]} {selectedYear}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+            <div className="flex-1 space-y-2">
+              <label className="block text-sm font-bold text-gray-900">Monthly Contribution Amount</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">₹</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={Number.isFinite(contributionInput) ? contributionInput : 0}
+                  onChange={(e) => setContributionInput(Number(e.target.value))}
+                  className="w-full pl-8 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                />
+              </div>
+              <p className="text-xs text-gray-500">
+                This value updates each member&apos;s <span className="font-semibold">payment.contribution</span> for the selected month.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+              <button
+                type="button"
+                disabled={busyContribution}
+                onClick={async () => {
+                  const value = Number(contributionInput);
+                  if (!Number.isFinite(value) || value < 0) return;
+                  setBusyContribution(true);
+                  try {
+                    await applyContributionToAllMembersForMonth(
+                      selectedMonth,
+                      selectedYear,
+                      value,
+                    );
+                    window.alert('Contribution updated successfully for all members.');
+                  } finally {
+                    setBusyContribution(false);
+                  }
+                }}
+                className="flex-1 px-5 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl text-sm font-semibold hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {busyContribution ? 'Applying...' : 'Apply To All Members'}
+              </button>
+
+              <button
+                type="button"
+                disabled={busyContribution}
+                onClick={() => {
+                  setContributionInput(getContributionAmount(selectedMonth, selectedYear));
+                }}
+                className="px-5 py-3 bg-white text-gray-800 border border-gray-200 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors duration-200"
+              >
+                Auto Fill According To Chit Rules
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Payment Details Table */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden">
+
         <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div>

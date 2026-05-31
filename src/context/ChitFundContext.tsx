@@ -216,7 +216,13 @@ interface ContextValue {
     year: number,
   ) => boolean;
   getContributionAmount: (month: number, year: number) => number;
+  applyContributionToAllMembersForMonth: (
+    month: number,
+    year: number,
+    contribution: number,
+  ) => Promise<void>;
 }
+
 
 const ChitFundContext = createContext<ContextValue | null>(null);
 
@@ -296,6 +302,69 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
     return getMonthAmount(month, year, state.settings);
   };
 
+  const applyContributionToAllMembersForMonth = async (
+    month: number,
+    year: number,
+    contribution: number,
+  ) => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const safeContribution = Math.max(0, contribution);
+
+    const paymentsById = new Map(
+      state.payments.map((p) => [p.id, p]),
+    );
+
+    const buildUpdatedPayment = (memberId: string): MonthlyPayment => {
+      const paymentId = paymentDocId(memberId, month, year);
+      const existing = paymentsById.get(paymentId);
+
+      const base: MonthlyPayment = existing
+        ? existing
+        : {
+            id: paymentId,
+            memberId,
+            month,
+            year,
+            previousBalance: 0,
+            contribution: safeContribution,
+            principalPaid: 0,
+            interest: 0,
+            totalPaid: safeContribution,
+            newBalance: 0,
+            givenMoney: 0,
+            paidAt: new Date().toISOString(),
+          };
+
+      return {
+        ...base,
+        contribution: safeContribution,
+        totalPaid:
+          safeContribution + (base.principalPaid ?? 0) + (base.interest ?? 0),
+      };
+    };
+
+    const memberPayments: MonthlyPayment[] = [...state.members].map((m) =>
+      buildUpdatedPayment(m.id),
+    );
+
+    for (let i = 0; i < memberPayments.length; i += 450) {
+      const batch = writeBatch(db);
+      for (const p of memberPayments.slice(i, i + 450)) {
+        batch.set(
+          doc(db, "users", user.uid, "payments", p.id),
+          p,
+          { merge: true },
+        );
+      }
+      await batch.commit();
+    }
+
+    await reloadFromFirestore();
+  };
+
+
   const reloadFromFirestore = async () => {
     const user = auth.currentUser;
     if (!user) return;
@@ -321,18 +390,78 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
       ...(d.data() as Omit<Member, "id">),
     }));
 
+    const memberIdSet = new Set(members.map((m) => m.id));
+
     const rawPayments: MonthlyPayment[] = paymentsSnapshot.docs.map((d) => ({
       id: d.id,
       ...(d.data() as Omit<MonthlyPayment, "id">),
     }));
-    const payments = normalizePaymentsCatalog(rawPayments);
 
-    const distributions: Distribution[] = distributionsSnapshot.docs.map(
+    const rawDistributions: Distribution[] = distributionsSnapshot.docs.map(
       (d) => ({
         id: d.id,
         ...(d.data() as Omit<Distribution, "id">),
       }),
     );
+
+    // Orphan detection: exclude payments/distributions whose memberId is missing.
+    const orphanPaymentDocs = rawPayments.filter(
+      (p) => !memberIdSet.has(p.memberId),
+    );
+    const orphanDistributionDocs = rawDistributions.filter(
+      (d) => !memberIdSet.has(d.memberId),
+    );
+
+    if (orphanPaymentDocs.length > 0 || orphanDistributionDocs.length > 0) {
+      console.warn("Orphan records found during reloadFromFirestore:", {
+        orphanPayments: orphanPaymentDocs.length,
+        orphanDistributions: orphanDistributionDocs.length,
+        orphanPaymentIds: orphanPaymentDocs.slice(0, 50).map((p) => p.id),
+        orphanDistributionIds: orphanDistributionDocs
+          .slice(0, 50)
+          .map((d) => d.id),
+      });
+    }
+
+    const paymentsWithoutOrphans = rawPayments.filter((p) =>
+      memberIdSet.has(p.memberId),
+    );
+    const distributionsWithoutOrphans = rawDistributions.filter((d) =>
+      memberIdSet.has(d.memberId),
+    );
+
+    // Optional automatic cleanup of orphan records in Firestore.
+    // This runs best-effort; it will not block app load.
+    const AUTO_CLEAN_ORPHANS = true;
+    if (AUTO_CLEAN_ORPHANS) {
+      try {
+        const DELETE_BATCH_SIZE = 450;
+        const orphanPaymentDocRefs = orphanPaymentDocs.map((p) =>
+          doc(db, "users", userId, "payments", p.id),
+        );
+        const orphanDistributionDocRefs = orphanDistributionDocs.map((d) =>
+          doc(db, "users", userId, "distributions", d.id),
+        );
+
+        const orphanRefs = [
+          ...orphanPaymentDocRefs,
+          ...orphanDistributionDocRefs,
+        ];
+
+        for (let i = 0; i < orphanRefs.length; i += DELETE_BATCH_SIZE) {
+          const batch = writeBatch(db);
+          for (const ref of orphanRefs.slice(i, i + DELETE_BATCH_SIZE)) {
+            batch.delete(ref);
+          }
+          await batch.commit();
+        }
+      } catch (error) {
+        console.error("Auto-clean orphan records failed:", error);
+      }
+    }
+
+    const payments = normalizePaymentsCatalog(paymentsWithoutOrphans);
+    const distributions = distributionsWithoutOrphans;
 
     const settings: Settings = settingsSnap.exists()
       ? ({ ...(settingsSnap.data() as Settings) } satisfies Settings)
@@ -451,12 +580,49 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
     const user = auth.currentUser;
     if (!user) return;
 
-    const batch = writeBatch(db);
-    batch.delete(doc(db, "users", user.uid, "members", id));
-    await batch.commit();
+    const userId = user.uid;
 
-    dispatch({ type: "DELETE_MEMBER", payload: id });
+    try {
+      // Data integrity: delete member + all related payments/distributions.
+      // If any operation fails, we throw and avoid leaving partial state.
+
+      // Fetch docs first so we can plan batch deletes.
+      const [paymentsSnap, distributionsSnap] = await Promise.all([
+        getDocs(collection(db, "users", userId, "payments")),
+        getDocs(collection(db, "users", userId, "distributions")),
+      ]);
+
+      const paymentsToDelete = paymentsSnap.docs.filter(
+        (d) => (d.data() as MonthlyPayment).memberId === id,
+      );
+      const distributionsToDelete = distributionsSnap.docs.filter(
+        (d) => (d.data() as Distribution).memberId === id,
+      );
+
+      const DELETE_BATCH_SIZE = 450; // under Firestore batch limit (500)
+
+      const deletions: Array<{ ref: any }> = [
+        { ref: doc(db, "users", userId, "members", id) },
+        ...paymentsToDelete.map((d) => ({ ref: d.ref })),
+        ...distributionsToDelete.map((d) => ({ ref: d.ref })),
+      ];
+
+      for (let i = 0; i < deletions.length; i += DELETE_BATCH_SIZE) {
+        const batch = writeBatch(db);
+        for (const item of deletions.slice(i, i + DELETE_BATCH_SIZE)) {
+          batch.delete(item.ref);
+        }
+        await batch.commit();
+      }
+
+      // Reload as source-of-truth so totals across pages are recalculated.
+      await reloadFromFirestore();
+    } catch (error) {
+      console.error("deleteMember failed:", { memberId: id, error });
+      throw error;
+    }
   };
+
 
   const recordPayment = async (
     memberId: string,
@@ -738,8 +904,10 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
         hasMemberPaid,
         hasMemberDistribution,
         getContributionAmount,
+        applyContributionToAllMembersForMonth,
       }}
     >
+
       {children}
     </ChitFundContext.Provider>
   );

@@ -1,10 +1,21 @@
 import { useState } from "react";
 import { useChitFund } from "../context/ChitFundContext";
 import { formatINR } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, Search, X } from "lucide-react";
 import * as XLSX from "xlsx";
 import { auth, db } from "@/lib/firebase";
 import { doc, writeBatch } from "firebase/firestore";
+
 
 interface MemberFormData {
   name: string;
@@ -29,6 +40,10 @@ export function MemberListPage() {
     phone: "",
   });
   const [isImporting, setIsImporting] = useState(false);
+
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [isDeletingMember, setIsDeletingMember] = useState(false);
+
 
   const filteredMembers = [...state.members]
     .sort((a, b) => parseInt(a.id) - parseInt(b.id))
@@ -241,6 +256,69 @@ export function MemberListPage() {
       )}
 
       <div className="bg-white rounded-lg border border-[#e9ecef] overflow-hidden">
+
+        <AlertDialog
+          open={confirmDeleteId !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setConfirmDeleteId(null);
+              setIsDeletingMember(false);
+            }
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Member?</AlertDialogTitle>
+              <AlertDialogDescription>
+                <div className="space-y-2">
+                  <p>This will permanently delete:</p>
+                  <ul className="list-disc pl-5">
+                    <li>Member Details</li>
+                    <li>Payment History</li>
+                    <li>Distribution History</li>
+                  </ul>
+                  <p>This action cannot be undone.</p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+
+            <AlertDialogFooter>
+              <AlertDialogCancel
+                onClick={() => {
+                  setConfirmDeleteId(null);
+                  setIsDeletingMember(false);
+                }}
+                className="bg-white"
+              >
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => {
+                  if (!confirmDeleteId) return;
+                  setIsDeletingMember(true);
+                  try {
+                    await deleteMember(confirmDeleteId);
+                    window.alert(
+                      "Member and all related records deleted successfully.",
+                    );
+                    setConfirmDeleteId(null);
+                  } catch (error) {
+                    const message =
+                      error instanceof Error ? error.message : String(error);
+                    window.alert("Failed to delete member: " + message);
+                    // Technical details logged in context.
+                  } finally {
+                    setIsDeletingMember(false);
+                  }
+                }}
+                disabled={isDeletingMember}
+              >
+                Delete Permanently
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         <div className="p-4 border-b border-[#e9ecef]">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6c757d]" />
@@ -320,14 +398,11 @@ export function MemberListPage() {
                           <Pencil className="w-3.5 h-3.5 text-[#6c757d]" />
                         </button>
                         <button
-                          onClick={async () => {
-                            if (
-                              confirm(
-                                "Are you sure you want to delete this member?",
-                              )
-                            ) {
-                              await deleteMember(member.id);
-                            }
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            // Dialog handled via controlled state below.
+                            setConfirmDeleteId(member.id);
                           }}
                           className="p-1.5 rounded hover:bg-[#f8d7da] transition-colors"
                           title="Delete"
