@@ -10,19 +10,6 @@ import { useEffect, useRef, useState } from 'react';
 
 import { auth, googleProvider } from '../lib/firebase';
 
-const CALLBACK_PATH = '/auth/callback';
-
-function hasTauriAuthCallbackUrl(url: string) {
-  try {
-    // Works for: homechit://auth/callback?...
-    // and: http(s)://.../auth/callback?...
-    const u = new URL(url);
-    return u.pathname === CALLBACK_PATH;
-  } catch {
-    return false;
-  }
-}
-
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,32 +41,11 @@ export function useAuth() {
       }
     };
 
-    // 1) If app was launched via the deep-link, URL should be present.
-    if (typeof window !== 'undefined') {
-      const current = window.location.href;
-      if (hasTauriAuthCallbackUrl(current)) {
-        completeRedirectFlow();
-      }
-    }
-
-    // 2) Some platforms dispatch the deep-link after launch.
-    // Tauri sends a custom URL to the webview via window location.
-    const onPopState = () => {
-      if (typeof window === 'undefined') return;
-      const current = window.location.href;
-      if (hasTauriAuthCallbackUrl(current)) {
-        completeRedirectFlow();
-      }
-    };
-
-    window.addEventListener('popstate', onPopState);
-
-    // Also attempt once on mount (covers cases where callback returns to the same SPA URL).
-    // But mark it as handled only after getRedirectResult completes.
+    // Normal web redirect flow: attempt once on mount.
+    // (Firebase will finalize the redirect using the current URL.)
     completeRedirectFlow();
 
     return () => {
-      window.removeEventListener('popstate', onPopState);
       unsubscribe();
     };
   }, []);
