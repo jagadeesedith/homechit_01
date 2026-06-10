@@ -29,6 +29,7 @@ import { buildConsistencyReport } from '@/lib/consistencyCheck';
 import { consolidateLegacyPaymentDocs } from '@/lib/legacyPaymentCleanup';
 import { formatINR } from '@/lib/utils';
 import { MONTHS } from '@/types';
+import { toast } from 'sonner';
 
 type ResetStep = 'confirm' | 'verify' | 'busy' | 'done' | 'error';
 
@@ -143,14 +144,7 @@ export function SettingsPage() {
   const handleConsolidateLegacyPayments = async () => {
     const user = auth.currentUser;
     if (!user) {
-      alert('Login first');
-      return;
-    }
-    if (
-      !confirm(
-        'Remove duplicate payment documents (legacy IDs) and keep one canonical record per member/month?',
-      )
-    ) {
+      toast.error('You must be logged in first');
       return;
     }
 
@@ -158,12 +152,12 @@ export function SettingsPage() {
     try {
       const report = await consolidateLegacyPaymentDocs(user.uid);
       await reloadFromFirestore();
-      alert(
-        `Consolidation complete.\nKept: ${report.keptCount} periods\nDeleted: ${report.deletedCount} duplicate doc(s)`,
+      toast.success(
+        `Consolidation complete. Kept: ${report.keptCount} periods, Deleted: ${report.deletedCount} duplicate doc(s)`,
       );
     } catch (e) {
       console.error(e);
-      alert('Consolidation failed. See console for details.');
+      toast.error('Consolidation failed. See console for details.');
     } finally {
       setCleaningLegacy(false);
     }
@@ -188,7 +182,7 @@ export function SettingsPage() {
   const openResetModal = async () => {
     const user = auth.currentUser;
     if (!user) {
-      alert('Login first');
+      toast.error('You must be logged in first');
       return;
     }
 
@@ -330,8 +324,8 @@ export function SettingsPage() {
 
       await reloadFromFirestore();
 
-      alert(
-        `Reset complete.\nDeleted ${deletedMembers} members, ${deletedPayments} payments, ${deletedDistributions} distributions.`,
+      toast.success(
+        `Reset complete. Deleted ${deletedMembers} members, ${deletedPayments} payments, ${deletedDistributions} distributions.`,
       );
 
       setTimeout(() => closeResetModal(), 1200);
@@ -346,11 +340,16 @@ export function SettingsPage() {
     }
   };
 
-  const [cooldownTick, setCooldownTick] = useState(0);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
 
   useEffect(() => {
     if (reset.step !== 'verify' || !reset.lastSentAt) return;
-    const timer = setInterval(() => setCooldownTick((t) => t + 1), 1000);
+    const compute = () => {
+      const elapsed = Date.now() - reset.lastSentAt!;
+      setCooldownRemaining(Math.max(0, OTP_COOLDOWN_MS - elapsed));
+    };
+    compute();
+    const timer = setInterval(compute, 1000);
     return () => clearInterval(timer);
   }, [reset.step, reset.lastSentAt]);
 
@@ -358,11 +357,7 @@ export function SettingsPage() {
 
   const disableDeleteButton = !resetConfirmMatches || reset.loadingSendOtp;
 
-  const otpCooldownRemainingMs = reset.lastSentAt
-    ? Math.max(0, OTP_COOLDOWN_MS - (Date.now() - reset.lastSentAt))
-    : 0;
-  const canResendOtp = otpCooldownRemainingMs === 0;
-  void cooldownTick;
+  const canResendOtp = cooldownRemaining === 0;
 
 
   return (
@@ -410,7 +405,7 @@ export function SettingsPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className=" text-sm font-bold text-gray-900 flex items-center gap-2">
+                    <label className="text-sm font-bold text-gray-900 flex items-center gap-2">
                       <DollarSign className="w-4 h-4 text-gray-500" />
                       First Month Amount (₹)
                     </label>
@@ -428,7 +423,7 @@ export function SettingsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className=" text-sm font-bold text-gray-900 flex items-center gap-2">
+                    <label className="text-sm font-bold text-gray-900 flex items-center gap-2">
                       <DollarSign className="w-4 h-4 text-gray-500" />
                       Monthly Contribution (₹)
                     </label>
@@ -446,7 +441,7 @@ export function SettingsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className=" text-sm font-bold text-gray-900 flex items-center gap-2">
+                    <label className="text-sm font-bold text-gray-900 flex items-center gap-2">
                       <Percent className="w-4 h-4 text-gray-500" />
                       Interest Rate (% )
                     </label>
@@ -466,7 +461,7 @@ export function SettingsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className=" text-sm font-bold text-gray-900 flex items-center gap-2">
+                    <label className="text-sm font-bold text-gray-900 flex items-center gap-2">
                       <Users className="w-4 h-4 text-gray-500" />
                       Total Members
                     </label>
@@ -494,7 +489,7 @@ export function SettingsPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="space-y-2">
-                    <label className=" text-sm font-bold text-gray-900 flex items-center gap-2">
+                    <label className="text-sm font-bold text-gray-900 flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-gray-500" />
                       Starting Month
                     </label>
@@ -519,7 +514,7 @@ export function SettingsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className=" text-sm font-bold text-gray-900 flex items-center gap-2">
+                    <label className="text-sm font-bold text-gray-900 flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-gray-500" />
                       Starting Year
                     </label>
@@ -532,7 +527,7 @@ export function SettingsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className=" text-sm font-bold text-gray-900 flex items-center gap-2">
+                    <label className="text-sm font-bold text-gray-900 flex items-center gap-2">
                       <Clock className="w-4 h-4 text-gray-500" />
                       Duration (Months)
                     </label>
@@ -827,7 +822,7 @@ export function SettingsPage() {
 
                     {reset.lastSentAt && !canResendOtp && (
                       <p className="text-xs text-gray-500 mt-2">
-                        Resend OTP in {Math.ceil(otpCooldownRemainingMs / 1000)}s
+                        Resend OTP in {Math.ceil(cooldownRemaining / 1000)}s
                       </p>
                     )}
                   </div>

@@ -26,7 +26,7 @@ import {
 
 import { cn } from '@/lib/utils';
 
-const windowsDownloadUrl = 'D:\\website\\chit\\kimi\\homechit_01\\public\\windows\\homechit_0.1.0_x64-setup.exe';
+const windowsDownloadUrl = '/windows/homechit_0.1.0_x64-setup.exe';
 const androidDownloadUrl = '/apk/homechit.apk';
 
 function triggerDownload(url: string) {
@@ -149,17 +149,17 @@ export function DownloadCenterPage() {
       {
         version: 'v0.0.9',
         releaseDate: '2026-04-11',
-        downloadUrl: 'D:\\website\\chit\\kimi\\homechit_01\\public\\windows\\homechit_0.0.9_x64-setup.exe',
+        downloadUrl: '/windows/homechit_0.0.9_x64-setup.exe',
       },
       {
         version: 'v0.0.8',
         releaseDate: '2026-03-22',
-        downloadUrl: 'D:\\website\\chit\\kimi\\homechit_01\\public\\windows\\homechit_0.0.8_x64-setup.exe',
+        downloadUrl: '/windows/homechit_0.0.8_x64-setup.exe',
       },
       {
         version: 'v0.0.7',
         releaseDate: '2026-02-28',
-        downloadUrl: 'D:\\website\\chit\\kimi\\homechit_01\\public\\windows\\homechit_0.0.7_x64-setup.exe',
+        downloadUrl: '/windows/homechit_0.0.7_x64-setup.exe',
       },
     ],
     [],

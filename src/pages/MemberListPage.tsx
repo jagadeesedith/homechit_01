@@ -15,6 +15,7 @@ import { Plus, Pencil, Trash2, Search, X } from "lucide-react";
 import * as XLSX from "xlsx";
 import { auth, db } from "@/lib/firebase";
 import { doc, writeBatch } from "firebase/firestore";
+import { toast } from "sonner";
 
 
 interface MemberFormData {
@@ -93,7 +94,7 @@ export function MemberListPage() {
     try {
       const user = auth.currentUser;
       if (!user) {
-        alert("User not logged in");
+        toast.error("You must be logged in to import members");
         return;
       }
 
@@ -116,22 +117,33 @@ export function MemberListPage() {
         balance: number;
       }[] = [];
 
+      // Determine the next available ID based on existing members
+      const maxExistingId = state.members.reduce((max, m) => {
+        const n = parseInt(m.id, 10);
+        return Number.isFinite(n) && n > max ? n : max;
+      }, 0);
+
       for (const item of jsonData) {
         const name = item.Name?.toString().trim();
-
         const phone = item.Phone?.toString().trim();
 
         if (!name) continue;
 
+        let newId = String(maxExistingId + importedMembers.length + 1);
+        // Ensure no collision with existing or previously imported IDs
+        const allExistingIds = new Set([
+          ...state.members.map((m) => m.id),
+          ...importedMembers.map((m) => m.id),
+        ]);
+        while (allExistingIds.has(newId)) {
+          newId = String(Number(newId) + 1);
+        }
+
         importedMembers.push({
-          id: String(state.members.length + importedMembers.length + 1),
-
+          id: newId,
           name,
-
           phone: phone || "",
-
           joinDate: new Date().toLocaleDateString(),
-
           balance: 0,
         });
       }
@@ -150,12 +162,12 @@ export function MemberListPage() {
         },
       });
 
-      alert("Members imported successfully");
+      toast.success("Members imported successfully");
       await reloadFromFirestore();
     } catch (error) {
       console.error(error);
 
-      alert("Import failed");
+      toast.error("Import failed");
     } finally {
       setIsImporting(false);
     }
@@ -298,14 +310,14 @@ export function MemberListPage() {
                   setIsDeletingMember(true);
                   try {
                     await deleteMember(confirmDeleteId);
-                    window.alert(
+                    toast.success(
                       "Member and all related records deleted successfully.",
                     );
                     setConfirmDeleteId(null);
                   } catch (error) {
                     const message =
                       error instanceof Error ? error.message : String(error);
-                    window.alert("Failed to delete member: " + message);
+                    toast.error("Failed to delete member: " + message);
                     // Technical details logged in context.
                   } finally {
                     setIsDeletingMember(false);

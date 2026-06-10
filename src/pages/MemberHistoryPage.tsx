@@ -19,6 +19,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import { toast } from "sonner";
 
 export function MemberHistoryPage() {
   const { state, getMemberPayments, reloadFromFirestore } = useChitFund();
@@ -96,7 +97,7 @@ export function MemberHistoryPage() {
 
     const user = auth.currentUser;
     if (!user) {
-      alert("User not logged in");
+      toast.error("You must be logged in to import history");
       return;
     }
 
@@ -108,11 +109,11 @@ export function MemberHistoryPage() {
         state.members,
       );
       await reloadFromFirestore();
-      alert(`Import complete\n\n${formatImportReport(report)}`);
+      toast.success(`Import complete\n${formatImportReport(report)}`);
     } catch (error) {
       console.error(error);
       const message = error instanceof Error ? error.message : String(error);
-      alert("Import Error: " + message);
+      toast.error("Import Error: " + message);
     } finally {
       setImporting(false);
     }

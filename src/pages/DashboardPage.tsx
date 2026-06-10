@@ -245,15 +245,15 @@ export function DashboardPage() {
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             </div>
 
-            {/* Mark All Paid */}
-            <button className="admin-button admin-press bg-gray-600 px-6 py-3 text-white shadow-[0_10px_24px_rgba(75,85,99,0.18)] hover:bg-gray-700">
+            {/* Install App */}
             <a
-  href="/apk/homechit.apk"
-  download
-  className="admin-button admin-press bg-blue-600 px-6 py-3 text-white shadow-[0_10px_24px_rgba(37,99,235,0.18)] hover:bg-blue-700"
->
-  📱 Install App
-</a></button>
+              href="/apk/homechit.apk"
+              download
+              className="admin-button admin-press bg-blue-600 px-6 py-3 text-white shadow-[0_10px_24px_rgba(37,99,235,0.18)] hover:bg-blue-700 no-underline"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v12m0 0l-3-3m3 3l3-3M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+              Install App
+            </a>
             <button
               onClick={handleMarkAllPaid}
               className="admin-button admin-press bg-emerald-600 px-6 py-3 text-white shadow-[0_10px_24px_rgba(5,150,105,0.18)] hover:bg-emerald-700"

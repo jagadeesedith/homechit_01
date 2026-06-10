@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ChitFundError, useChitFund } from '../context/ChitFundContext';
 import { formatINR } from '@/lib/utils';
 import { MONTHS } from '@/types';
@@ -47,9 +47,11 @@ const remaining = totalCollected - totalDistributed;
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
+  // Only set default amount when form opens, don't override user edits
+  const handleOpenForm = () => {
+    setShowForm(true);
     setAmount(String(Math.max(0, Math.round(remaining))));
-  }, [selectedMonth, selectedYear, remaining]);
+  };
 
   const currentYear = new Date().getFullYear();
   const minYear = Math.min(2024, state.settings.startYear, currentYear - 2);
@@ -231,7 +233,7 @@ const remaining = totalCollected - totalDistributed;
                 {!showForm && (
                   <button
                     type="button"
-                    onClick={() => setShowForm(true)}
+                    onClick={handleOpenForm}
                     disabled={remaining <= 0}
                     className="w-10 h-10 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center hover:bg-white/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >

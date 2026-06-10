@@ -21,7 +21,7 @@ export function buildConsistencyReport(
   members: Member[],
   payments: MonthlyPayment[],
   distributions: Distribution[],
-  settings: Settings,
+  _settings: Settings,
   month: number,
   year: number,
 ): ConsistencyReport {
@@ -66,8 +66,6 @@ export function buildConsistencyReport(
       `Month ${month}/${year}: ${rawCount - dedupedCount} duplicate payment doc(s) in data — run Consolidate duplicate payments`,
     );
   }
-
-  void settings;
 
   return {
     month,

@@ -1,11 +1,9 @@
 import * as XLSX from "xlsx";
-import { doc, getDoc, writeBatch } from "firebase/firestore";
+import { doc, getDoc, writeBatch, type DocumentReference } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
 import { distributionDocId, paymentDocId } from "@/lib/financialIds";
 import type { Distribution, Member, MonthlyPayment } from "@/types";
-
-export type ImportRowResult = "new" | "updated" | "skipped" | "error";
 
 export type ImportReport = {
   newCount: number;
@@ -116,6 +114,31 @@ async function commitBatch<T extends object>(
   }
 }
 
+type ParsedRow = {
+  memberId: string;
+  month: number;
+  year: number;
+  payment: MonthlyPayment;
+  givenMoney: number;
+};
+
+async function fetchExistingDocs(
+  refs: DocumentReference[],
+): Promise<Map<string, Record<string, unknown>>> {
+  const map = new Map<string, Record<string, unknown>>();
+  const CHUNK = 50;
+  for (let i = 0; i < refs.length; i += CHUNK) {
+    const chunk = refs.slice(i, i + CHUNK);
+    const snaps = await Promise.all(chunk.map((ref) => getDoc(ref)));
+    for (const snap of snaps) {
+      if (snap.exists()) {
+        map.set(snap.id, snap.data());
+      }
+    }
+  }
+  return map;
+}
+
 export async function importPaymentHistoryFiles(
   files: File[],
   userId: string,
@@ -132,9 +155,15 @@ export async function importPaymentHistoryFiles(
   }> = [];
   const seenDistributionKeys = new Set<string>();
 
+  // Phase 1: parse all rows into ParsedRow[], collecting doc refs
+  const parsedRows: ParsedRow[] = [];
+  const paymentRefs: DocumentReference[] = [];
+  const distributionRefs: DocumentReference[] = [];
+  const distIdToKey = new Map<string, string>();
+
   for (const file of files) {
-    const data = await file.arrayBuffer();
-    const workbook = XLSX.read(data);
+    const buf = await file.arrayBuffer();
+    const workbook = XLSX.read(buf);
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet) as Record<string, unknown>[];
 
@@ -156,61 +185,21 @@ export async function importPaymentHistoryFiles(
         }
 
         const id = paymentDocId(memberId, month, year);
-        const incoming = paymentPayload(row, memberId, month, year, id);
-
-        const existingSnap = await getDoc(
-          doc(db, "users", userId, "payments", id),
-        );
-
-        if (existingSnap.exists()) {
-          const existing = {
-            id,
-            ...(existingSnap.data() as Omit<MonthlyPayment, "id">),
-          };
-          if (paymentsMatch(existing, incoming)) {
-            report.skippedCount += 1;
-          } else {
-            paymentOps.push({
-              ref: doc(db, "users", userId, "payments", id),
-              data: incoming,
-            });
-            report.updatedCount += 1;
-          }
-        } else {
-          paymentOps.push({
-            ref: doc(db, "users", userId, "payments", id),
-            data: incoming,
-          });
-          report.newCount += 1;
-        }
-
+        const payment = paymentPayload(row, memberId, month, year, id);
         const givenMoney = num(row["given amount"]);
+
+        parsedRows.push({ memberId, month, year, payment, givenMoney });
+        paymentRefs.push(doc(db, "users", userId, "payments", id));
+
         if (givenMoney > 0) {
           const distKey = `${year}-${month}-${memberId}`;
-          if (seenDistributionKeys.has(distKey)) {
-            report.distributionSkipped += 1;
-          } else {
+          if (!seenDistributionKeys.has(distKey)) {
             seenDistributionKeys.add(distKey);
             const distId = distributionDocId(memberId, month, year);
-            const distRef = doc(db, "users", userId, "distributions", distId);
-            const distSnap = await getDoc(distRef);
-
-            if (distSnap.exists()) {
-              report.distributionSkipped += 1;
-            } else {
-              distributionOps.push({
-                ref: distRef,
-                data: {
-                  id: distId,
-                  memberId,
-                  month,
-                  year,
-                  amount: givenMoney,
-                  givenAt: new Date().toISOString(),
-                },
-              });
-              report.distributionNew += 1;
-            }
+            distIdToKey.set(distId, distKey);
+            distributionRefs.push(
+              doc(db, "users", userId, "distributions", distId),
+            );
           }
         }
       } catch (err) {
@@ -221,6 +210,57 @@ export async function importPaymentHistoryFiles(
     }
   }
 
+  // Phase 2: batch fetch existing payment and distribution docs
+  const [existingPayments, existingDistributions] = await Promise.all([
+    fetchExistingDocs(paymentRefs),
+    fetchExistingDocs(distributionRefs),
+  ]);
+
+  // Phase 3: process rows using pre-fetched data (no more sequential getDoc)
+  for (const { memberId, month, year, payment, givenMoney } of parsedRows) {
+    const paymentId = paymentDocId(memberId, month, year);
+    const paymentRef = doc(db, "users", userId, "payments", paymentId);
+    const existingPaymentData = existingPayments.get(paymentId);
+
+    if (existingPaymentData) {
+      const existing = {
+        id: paymentId,
+        ...(existingPaymentData as Omit<MonthlyPayment, "id">),
+      };
+      if (paymentsMatch(existing, payment)) {
+        report.skippedCount += 1;
+      } else {
+        paymentOps.push({ ref: paymentRef, data: payment });
+        report.updatedCount += 1;
+      }
+    } else {
+      paymentOps.push({ ref: paymentRef, data: payment });
+      report.newCount += 1;
+    }
+
+    if (givenMoney > 0) {
+      const distId = distributionDocId(memberId, month, year);
+      const distKey = distIdToKey.get(distId);
+      if (distKey && existingDistributions.has(distId)) {
+        report.distributionSkipped += 1;
+      } else if (distKey) {
+        distributionOps.push({
+          ref: doc(db, "users", userId, "distributions", distId),
+          data: {
+            id: distId,
+            memberId,
+            month,
+            year,
+            amount: givenMoney,
+            givenAt: new Date().toISOString(),
+          },
+        });
+        report.distributionNew += 1;
+      }
+    }
+  }
+
+  // Phase 4: batch write
   try {
     if (paymentOps.length > 0) {
       await commitBatch(paymentOps);

@@ -1,8 +1,9 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
 import { useChitFund } from '../context/ChitFundContext';
 import { formatINR } from '@/lib/utils';
 import { MONTHS } from '@/types';
 import { Calendar, TrendingUp, Users, CheckCircle, XCircle, DollarSign } from 'lucide-react';
+import { toast } from 'sonner';
 
 export function MonthlySummaryPage() {
 
@@ -50,12 +51,12 @@ export function MonthlySummaryPage() {
       ? Math.round((paidMembersCount / state.members.length) * 100)
       : 0;
 
-  const [contributionInput, setContributionInput] = React.useState<number>(
+  const [contributionInput, setContributionInput] = useState<number>(
     getContributionAmount(selectedMonth, selectedYear),
   );
-  const [busyContribution, setBusyContribution] = React.useState(false);
+  const [busyContribution, setBusyContribution] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     setContributionInput(getContributionAmount(selectedMonth, selectedYear));
   }, [selectedMonth, selectedYear, getContributionAmount]);
 
@@ -219,7 +220,7 @@ export function MonthlySummaryPage() {
                       selectedYear,
                       value,
                     );
-                    window.alert('Contribution updated successfully for all members.');
+                    toast.success('Contribution updated successfully for all members.');
                   } finally {
                     setBusyContribution(false);
                   }
