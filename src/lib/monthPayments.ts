@@ -77,7 +77,7 @@ export function sumTotalPaid(
     (p) => p.month === month && p.year === year,
   );
   return dedupePaymentsByMember(monthPayments).reduce(
-    (sum, p) => sum + (p.totalPaid || 0),
+    (sum, p) => sum + p.contribution + p.principalPaid + p.interest,
     0,
   );
 }

@@ -56,12 +56,12 @@ type Action =
 
 const defaultSettings: Settings = {
   firstMonthAmount: 2000,
-  monthlyAmount: 500,
+  monthlyAmount: 2000,
   interestRate: 2,
   durationMonths: 36,
-  totalMembers: 60,
-  startMonth: 4,
-  startYear: 2026,
+  totalMembers: 72,
+  startMonth: 1,
+  startYear: 2025,
 };
 
 function nextNumericMemberId(existing: Member[]): string {
@@ -205,6 +205,7 @@ interface ContextValue {
   getTotalCollectedForMonth: (month: number, year: number) => number;
   getPaidCountForMonth: (month: number, year: number) => number;
   getPendingCountForMonth: (month: number, year: number) => number;
+  getCarryForwardBalance: (month: number, year: number) => number;
   getRemainingDistributionForMonth: (
     month: number,
     year: number,
@@ -276,10 +277,27 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
       .reduce((sum, d) => sum + d.amount, 0);
   };
 
+  const getCarryForwardBalance = (month: number, year: number): number => {
+    const prevMonth = month === 1 ? 12 : month - 1;
+    const prevYear = month === 1 ? year - 1 : year;
+
+    const prevMonthHasPayments = state.payments.some(
+      (p) => p.month === prevMonth && p.year === prevYear,
+    );
+    if (!prevMonthHasPayments) return 0;
+
+    const prevCollected = getTotalCollectedForMonth(prevMonth, prevYear);
+    const prevDistributed = getTotalDistributedForMonth(prevMonth, prevYear);
+    const prevCarry = getCarryForwardBalance(prevMonth, prevYear);
+
+    return Math.max(0, prevCarry + prevCollected - prevDistributed);
+  };
+
   const getRemainingDistributionForMonth = (month: number, year: number) => {
     return (
-      getTotalCollectedForMonth(month, year) -
-      getTotalDistributedForMonth(month, year)
+      getCarryForwardBalance(month, year)
+      + getTotalCollectedForMonth(month, year)
+      - getTotalDistributedForMonth(month, year)
     );
   };
 
@@ -900,6 +918,7 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
         getTotalCollectedForMonth,
         getPaidCountForMonth,
         getPendingCountForMonth,
+        getCarryForwardBalance,
         getRemainingDistributionForMonth,
         hasMemberPaid,
         hasMemberDistribution,

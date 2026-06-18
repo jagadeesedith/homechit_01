@@ -12,6 +12,9 @@ export function DistributionPage() {
     addDistribution,
     deleteDistribution,
     hasMemberDistribution,
+    getTotalCollectedForMonth,
+    getRemainingDistributionForMonth,
+    getCarryForwardBalance,
   } = useChitFund();
 
  const selectedMonth = state.selectedMonth;
@@ -21,25 +24,15 @@ const monthDistributions = state.distributions.filter(
   (d) => d.month === selectedMonth && d.year === selectedYear,
 );
 
-const payments = state.payments.filter(
-  (p) => p.month === selectedMonth && p.year === selectedYear
-);
-
-const totalCollected = payments.reduce(
-  (sum, p) =>
-    sum +
-    p.contribution +
-    p.principalPaid +
-    p.interest,
-  0
-);
+const totalCollected = getTotalCollectedForMonth(selectedMonth, selectedYear);
 
 const totalDistributed = monthDistributions.reduce(
   (sum, d) => sum + d.amount,
-  0
+  0,
 );
 
-const remaining = totalCollected - totalDistributed;
+const carryForward = getCarryForwardBalance(selectedMonth, selectedYear);
+const remaining = getRemainingDistributionForMonth(selectedMonth, selectedYear);
 
   const [showForm, setShowForm] = useState(false);
   const [selectedMember, setSelectedMember] = useState('');
@@ -174,7 +167,7 @@ const remaining = totalCollected - totalDistributed;
         </div>
 
         {/* Money Overview Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-6 shadow-xl text-white">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
@@ -215,6 +208,18 @@ const remaining = totalCollected - totalDistributed;
             <p className="text-amber-200 text-xs mt-2">
               {remaining < 0 ? 'Over-distributed — review entries' : 'Available for distribution'}
             </p>
+          </div>
+
+          <div className="bg-gradient-to-br from-purple-500 to-violet-600 rounded-2xl p-6 shadow-xl text-white">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
+                <TrendingUp className="w-6 h-6 text-white" />
+              </div>
+              <ArrowUpRight className="w-5 h-5 text-white/80" />
+            </div>
+            <p className="text-purple-100 text-sm font-medium mb-1">Carry Forward</p>
+            <p className="text-3xl font-black text-white">{formatINR(carryForward)}</p>
+            <p className="text-purple-200 text-xs mt-2">Surplus from previous month</p>
           </div>
         </div>
       </div>

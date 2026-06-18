@@ -238,6 +238,9 @@ export async function importPaymentHistoryFiles(
       report.newCount += 1;
     }
 
+    // Validation: warn if distributions exceed collections for a month
+    // (carry-forward from previous months may legitimately cover the difference)
+    // This is a warning only — we trust the Excel source data.
     if (givenMoney > 0) {
       const distId = distributionDocId(memberId, month, year);
       const distKey = distIdToKey.get(distId);
@@ -257,6 +260,27 @@ export async function importPaymentHistoryFiles(
         });
         report.distributionNew += 1;
       }
+    }
+  }
+
+  // Warn if any month's distributions exceed its collections
+  const collectedByPeriod = new Map<string, number>();
+  const distributedByPeriod = new Map<string, number>();
+
+  for (const { month: m, year: y, payment } of parsedRows) {
+    const key = `${y}-${m}`;
+    collectedByPeriod.set(key, (collectedByPeriod.get(key) ?? 0) + payment.totalPaid);
+  }
+  for (const op of distributionOps) {
+    const key = `${op.data.year}-${op.data.month}`;
+    distributedByPeriod.set(key, (distributedByPeriod.get(key) ?? 0) + op.data.amount);
+  }
+  for (const [period, distTotal] of distributedByPeriod) {
+    const collTotal = collectedByPeriod.get(period) ?? 0;
+    if (distTotal > collTotal) {
+      report.errors.push(
+        `Warning ${period}: distributed ₹${distTotal} > collected ₹${collTotal}. Previous month carry-forward may cover this.`
+      );
     }
   }
 
