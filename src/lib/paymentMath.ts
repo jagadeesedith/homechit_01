@@ -18,7 +18,15 @@ export type PaymentCalculationResult = {
 
 /**
  * Outstanding balance for interest: max(ledger newBalance, member.balance).
- * Loans update member.balance; payments update ledger newBalance.
+ *
+ * Loans update member.balance immediately (in addDistribution).
+ * The payment ledger (newBalance) is only updated when a payment exists
+ * for the same member/month/year as the loan. If no such payment exists,
+ * the ledger lags behind member.balance until the next payment is recorded.
+ *
+ * Math.max(ledger, stored) ensures we always charge interest on the true
+ * liability — if a loan was given, member.balance reflects it even when
+ * the ledger does not.
  */
 export function resolveOutstandingBalance(
   member: Member | undefined,

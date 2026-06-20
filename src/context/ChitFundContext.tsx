@@ -504,14 +504,14 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
     return { payments, distributions, members };
   };
 
-  const repairRanRef = useRef(false);
+  const repairRanRef = useRef("");
 
   const repairStaleGivenMoney = async (
     payments: MonthlyPayment[],
     distributions: Distribution[],
     members: Member[],
   ) => {
-    if (repairRanRef.current) return;
+    if (repairRanRef.current === "v2") return;
     const user = auth.currentUser;
     if (!user) return;
 
@@ -529,12 +529,19 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
           p.year === dist.year,
       );
       if (!payment) continue;
-      if ((payment.givenMoney ?? 0) !== 0) continue;
+
+      const expectedNewBalance =
+        (payment.previousBalance - payment.principalPaid) + dist.amount;
+      const needsFix =
+        (payment.givenMoney ?? 0) === 0 ||
+        payment.givenMoney !== dist.amount ||
+        payment.newBalance !== expectedNewBalance;
+      if (!needsFix) continue;
 
       fixes.push({
         payment,
         givenMoney: dist.amount,
-        newBalance: payment.newBalance + dist.amount,
+        newBalance: expectedNewBalance,
       });
     }
 
@@ -582,7 +589,7 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
       });
     }
 
-    repairRanRef.current = true;
+    repairRanRef.current = "v2";
   };
 
   useEffect(() => {
