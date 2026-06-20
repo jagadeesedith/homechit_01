@@ -3,6 +3,7 @@ import {
   useContext,
   useEffect,
   useReducer,
+  useRef,
   type ReactNode,
 } from "react";
 import { onAuthStateChanged } from "firebase/auth";
@@ -170,7 +171,10 @@ export class ChitFundError extends Error {
 interface ContextValue {
   state: State;
   dispatch: React.Dispatch<Action>;
-  reloadFromFirestore: () => Promise<void>;
+  reloadFromFirestore: () => Promise<
+    | { payments: MonthlyPayment[]; distributions: Distribution[]; members: Member[] }
+    | undefined
+  >;
   setSelectedMonthYear: (month: number, year: number) => void;
   addMember: (
     member: Omit<Member, "id" | "joinDate" | "balance">,
@@ -496,6 +500,89 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
         selectedYear: preserveYear || settings.startYear,
       },
     });
+
+    return { payments, distributions, members };
+  };
+
+  const repairRanRef = useRef(false);
+
+  const repairStaleGivenMoney = async (
+    payments: MonthlyPayment[],
+    distributions: Distribution[],
+    members: Member[],
+  ) => {
+    if (repairRanRef.current) return;
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const fixes: Array<{
+      payment: MonthlyPayment;
+      givenMoney: number;
+      newBalance: number;
+    }> = [];
+
+    for (const dist of distributions) {
+      const payment = payments.find(
+        (p) =>
+          p.memberId === dist.memberId &&
+          p.month === dist.month &&
+          p.year === dist.year,
+      );
+      if (!payment) continue;
+      if ((payment.givenMoney ?? 0) !== 0) continue;
+
+      fixes.push({
+        payment,
+        givenMoney: dist.amount,
+        newBalance: payment.newBalance + dist.amount,
+      });
+    }
+
+    if (fixes.length === 0) return;
+
+    console.info(
+      `[repairStaleGivenMoney] Fixing ${fixes.length} payment(s)`,
+      fixes.map((f) => ({
+        id: f.payment.id,
+        givenMoney: f.givenMoney,
+        newBalance: f.newBalance,
+      })),
+    );
+
+    for (let i = 0; i < fixes.length; i += 450) {
+      const batch = writeBatch(db);
+      for (const fix of fixes.slice(i, i + 450)) {
+        const updatedPayment: MonthlyPayment = {
+          ...fix.payment,
+          givenMoney: fix.givenMoney,
+          newBalance: fix.newBalance,
+        };
+        batch.set(
+          doc(db, "users", user.uid, "payments", updatedPayment.id),
+          updatedPayment,
+          { merge: true },
+        );
+      }
+      await batch.commit();
+    }
+
+    for (const fix of fixes) {
+      const member = members.find(
+        (m) => m.id === fix.payment.memberId,
+      );
+      if (!member) continue;
+      const updatedPayment: MonthlyPayment = {
+        ...fix.payment,
+        givenMoney: fix.givenMoney,
+        newBalance: fix.newBalance,
+      };
+      dispatch({
+        type: "RECORD_PAYMENT",
+        payload: { payment: updatedPayment, updatedMember: member },
+      });
+    }
+
+    repairRanRef.current = true;
   };
 
   useEffect(() => {
@@ -516,7 +603,14 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        await reloadFromFirestore();
+        const data = await reloadFromFirestore();
+        if (data) {
+          await repairStaleGivenMoney(
+            data.payments,
+            data.distributions,
+            data.members,
+          );
+        }
       } catch (error) {
         console.error("Firestore load error:", error);
       }
@@ -833,6 +927,9 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
       balance: member.balance + amount,
     };
 
+    const paymentId = paymentDocId(memberId, month, year);
+    const existingPayment = state.payments.find((p) => p.id === paymentId);
+
     const batch = writeBatch(db);
     batch.set(
       doc(db, "users", user.uid, "distributions", distribution.id),
@@ -844,9 +941,30 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
       updatedMember,
       { merge: true },
     );
-    await batch.commit();
 
-    dispatch({ type: "UPDATE_MEMBER", payload: updatedMember });
+    if (existingPayment) {
+      const updatedPayment: MonthlyPayment = {
+        ...existingPayment,
+        givenMoney: (existingPayment.givenMoney ?? 0) + amount,
+        newBalance: existingPayment.newBalance + amount,
+      };
+      batch.set(
+        doc(db, "users", user.uid, "payments", paymentId),
+        updatedPayment,
+        { merge: true },
+      );
+      await batch.commit();
+
+      dispatch({
+        type: "RECORD_PAYMENT",
+        payload: { payment: updatedPayment, updatedMember },
+      });
+    } else {
+      await batch.commit();
+
+      dispatch({ type: "UPDATE_MEMBER", payload: updatedMember });
+    }
+
     dispatch({ type: "ADD_DISTRIBUTION", payload: distribution });
   };
 
@@ -867,6 +985,13 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
       balance: Math.max(0, member.balance - distribution.amount),
     };
 
+    const paymentId = paymentDocId(
+      distribution.memberId,
+      distribution.month,
+      distribution.year,
+    );
+    const existingPayment = state.payments.find((p) => p.id === paymentId);
+
     const batch = writeBatch(db);
     batch.delete(doc(db, "users", user.uid, "distributions", distributionId));
     batch.set(
@@ -874,9 +999,33 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
       updatedMember,
       { merge: true },
     );
-    await batch.commit();
 
-    dispatch({ type: "UPDATE_MEMBER", payload: updatedMember });
+    if (existingPayment) {
+      const updatedPayment: MonthlyPayment = {
+        ...existingPayment,
+        givenMoney: Math.max(
+          0,
+          (existingPayment.givenMoney ?? 0) - distribution.amount,
+        ),
+        newBalance: Math.max(0, existingPayment.newBalance - distribution.amount),
+      };
+      batch.set(
+        doc(db, "users", user.uid, "payments", paymentId),
+        updatedPayment,
+        { merge: true },
+      );
+      await batch.commit();
+
+      dispatch({
+        type: "RECORD_PAYMENT",
+        payload: { payment: updatedPayment, updatedMember },
+      });
+    } else {
+      await batch.commit();
+
+      dispatch({ type: "UPDATE_MEMBER", payload: updatedMember });
+    }
+
     dispatch({ type: "DELETE_DISTRIBUTION", payload: distributionId });
   };
 

@@ -19,6 +19,7 @@ import {
 import { MONTHS } from "@/types";
 import { useChitFund } from "../context/ChitFundContext";
 import { Calendar, ChevronDown, Users, TrendingUp } from "lucide-react";
+import { RadialMemberDial } from "@/components/RadialMemberDial";
 import { toast } from "sonner";
 
 export function DashboardPage() {
@@ -328,6 +329,14 @@ export function DashboardPage() {
           onClose={() => setSelectedMember(null)}
         />
       )}
+
+      <RadialMemberDial
+        sortedMembers={sortedMembers}
+        maxMemberNumber={maxMemberNumber}
+        openMember={openMember}
+        handleActiveGroupChange={handleActiveGroupChange}
+        selectMode={selectMode}
+      />
 
       {selectMode && selectedMemberIds.size > 0 && (
         <div className="admin-slide-up fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-14px_36px_rgba(15,23,42,0.12)] backdrop-blur lg:left-[280px]">
