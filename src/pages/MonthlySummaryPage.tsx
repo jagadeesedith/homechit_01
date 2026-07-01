@@ -4,6 +4,7 @@ import { formatINR } from '@/lib/utils';
 import { MONTHS } from '@/types';
 import { Calendar, TrendingUp, Users, CheckCircle, XCircle, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
+import { MonthYearPicker } from '@/components/MonthYearPicker';
 
 export function MonthlySummaryPage() {
 
@@ -19,14 +20,8 @@ export function MonthlySummaryPage() {
   } = useChitFund();
 
 
-  const currentYear = new Date().getFullYear();
   const selectedMonth = state.selectedMonth;
   const selectedYear = state.selectedYear;
-
-  const minYear = Math.min(2024, state.settings.startYear, currentYear - 2);
-  const maxYear = Math.max(currentYear + 5, state.settings.startYear + 5);
-  const years: number[] = [];
-  for (let y = minYear; y <= maxYear; y += 1) years.push(y);
 
   const payments = getMonthPayments(selectedMonth, selectedYear);
   const paidMembersCount = getPaidCountForMonth(selectedMonth, selectedYear);
@@ -130,41 +125,28 @@ export function MonthlySummaryPage() {
               <p className="text-sm text-gray-600">Choose month and year to view summary</p>
             </div>
             
-            <div className="flex flex-col sm:flex-row gap-3">
-              {/* Month Pills */}
-              <div className="flex flex-wrap gap-2 p-1 bg-gray-50 rounded-xl">
-                {MONTHS.map((m, i) => {
-                  const monthNum = i + 1;
-                  const isActive = selectedMonth === monthNum;
-                  return (
-                    <button
-                      key={m}
-                      onClick={() => setSelectedMonthYear(monthNum, selectedYear)}
-                      className={`
-                        px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200
-                        ${isActive
-                          ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md'
-                          : 'text-gray-600 hover:bg-white hover:shadow-sm'
-                        }
-                      `}
-                    >
-                      {m.slice(0, 3)}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Year Selector */}
-              <select
-                value={selectedYear}
-                onChange={(e) => setSelectedMonthYear(selectedMonth, Number(e.target.value))}
-                className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 shadow-sm hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-              >
-                {years.map(y => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-            </div>
+            <MonthYearPicker
+              month={selectedMonth}
+              year={selectedYear}
+              onChange={(m, y) => setSelectedMonthYear(m, y)}
+              startYear={state.settings.startYear}
+              yearSelectClassName="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 shadow-sm hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+              renderMonth={({ month: monthNum, isActive, onChange }) => (
+                <button
+                  key={monthNum}
+                  onClick={() => onChange(monthNum)}
+                  className={`
+                    px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200
+                    ${isActive
+                      ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md'
+                      : 'text-gray-600 hover:bg-white hover:shadow-sm'
+                    }
+                  `}
+                >
+                  {MONTHS[monthNum - 1].slice(0, 3)}
+                </button>
+              )}
+            />
           </div>
         </div>
       </div>

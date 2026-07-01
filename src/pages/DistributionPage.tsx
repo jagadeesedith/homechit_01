@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { ChitFundError, useChitFund } from '../context/ChitFundContext';
-import { formatINR } from '@/lib/utils';
+import { formatINR, filterMembers } from '@/lib/utils';
 import { MONTHS } from '@/types';
-import { HandCoins, Plus, Wallet, TrendingUp, Users, ChevronDown, ArrowUpRight, ArrowDownRight, Trash2, AlertTriangle } from 'lucide-react';
+import { HandCoins, Plus, Wallet, TrendingUp, Users, ArrowUpRight, ArrowDownRight, Trash2, AlertTriangle, Layers } from 'lucide-react';
 import { toast } from 'sonner';
+import { SearchableMemberSelect } from '@/components/SearchableMemberSelect';
+import { MonthYearPicker } from '@/components/MonthYearPicker';
+import { MemberCheckboxList } from '@/components/MemberCheckboxList';
 
 export function DistributionPage() {
   const {
@@ -39,18 +42,16 @@ const remaining = getRemainingDistributionForMonth(selectedMonth, selectedYear);
   const [amount, setAmount] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
+  const [bulkAmount, setBulkAmount] = useState('');
+  const [bulkMemberAmounts, setBulkMemberAmounts] = useState<Record<string, string>>({});
 
   // Only set default amount when form opens, don't override user edits
   const handleOpenForm = () => {
     setShowForm(true);
     setAmount(String(Math.max(0, Math.round(remaining))));
   };
-
-  const currentYear = new Date().getFullYear();
-  const minYear = Math.min(2024, state.settings.startYear, currentYear - 2);
-  const maxYear = Math.max(currentYear + 5, state.settings.startYear + 5);
-  const years: number[] = [];
-  for (let y = minYear; y <= maxYear; y += 1) years.push(y);
 
   const saveDistribution = async () => {
     if (!selectedMember || !amount || submitting) return;
@@ -96,6 +97,58 @@ const remaining = getRemainingDistributionForMonth(selectedMonth, selectedYear);
     await saveDistribution();
   };
 
+  const handleBulkDistribute = async () => {
+    if (bulkSelected.size === 0 || submitting) return;
+
+    setSubmitting(true);
+    let successCount = 0;
+    let skipCount = 0;
+    let runningRemaining = remaining;
+
+    for (const memberId of bulkSelected) {
+      const amt = Number(bulkMemberAmounts[memberId] ?? bulkAmount);
+      if (!Number.isFinite(amt) || amt <= 0) {
+        skipCount++;
+        continue;
+      }
+
+      if (hasMemberDistribution(memberId, selectedMonth, selectedYear)) {
+        toast.warning(`${memberId} already received a loan this month — skipped`);
+        skipCount++;
+        continue;
+      }
+
+      if (amt > runningRemaining) {
+        toast.warning(`${memberId}: amount exceeds remaining balance — skipped`);
+        skipCount++;
+        continue;
+      }
+
+      try {
+        await addDistribution(memberId, selectedMonth, selectedYear, amt);
+        runningRemaining -= amt;
+        successCount++;
+      } catch (error) {
+        const message =
+          error instanceof ChitFundError ? error.message : 'Could not save distribution';
+        toast.error(`${memberId}: ${message}`);
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(`Distributed to ${successCount} member(s)`);
+    }
+    if (skipCount > 0) {
+      toast.info(`${skipCount} member(s) skipped`);
+    }
+
+    setBulkSelected(new Set());
+    setBulkAmount('');
+    setBulkMemberAmounts({});
+    setBulkMode(false);
+    setSubmitting(false);
+  };
+
   const handleDeleteDistribution = async (distributionId: string) => {
     try {
       await deleteDistribution(distributionId);
@@ -137,32 +190,12 @@ const remaining = getRemainingDistributionForMonth(selectedMonth, selectedYear);
               <p className="text-sm text-gray-600">Choose month and year to view distributions</p>
             </div>
             
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative">
-                <select
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonthYear(Number(e.target.value), selectedYear)}
-                  className="appearance-none bg-white border border-gray-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-gray-700 shadow-sm hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200"
-                >
-                  {MONTHS.map((month, index) => (
-                    <option key={index} value={index + 1}>
-                      {month}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-              </div>
-
-              <select
-                value={selectedYear}
-                onChange={(e) => setSelectedMonthYear(selectedMonth, Number(e.target.value))}
-                className="px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 shadow-sm hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200"
-              >
-                {years.map((y) => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-            </div>
+            <MonthYearPicker
+              month={selectedMonth}
+              year={selectedYear}
+              onChange={(m, y) => setSelectedMonthYear(m, y)}
+              startYear={state.settings.startYear}
+            />
           </div>
         </div>
 
@@ -236,34 +269,40 @@ const remaining = getRemainingDistributionForMonth(selectedMonth, selectedYear);
                   <p className="text-orange-100 text-sm">Give loan to member</p>
                 </div>
                 {!showForm && (
-                  <button
-                    type="button"
-                    onClick={handleOpenForm}
-                    disabled={remaining <= 0}
-                    className="w-10 h-10 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center hover:bg-white/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Plus className="w-5 h-5 text-white" />
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setBulkMode(true); setShowForm(true); setAmount(String(Math.max(0, Math.round(remaining)))); setBulkAmount(String(Math.max(0, Math.round(remaining)))); }}
+                      disabled={remaining <= 0}
+                      className="w-10 h-10 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center hover:bg-white/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Bulk distribute"
+                    >
+                      <Layers className="w-5 h-5 text-white" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleOpenForm}
+                      disabled={remaining <= 0}
+                      className="w-10 h-10 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center hover:bg-white/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Plus className="w-5 h-5 text-white" />
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
 
-            {showForm && (
+            {showForm && !bulkMode && (
               <div className="p-6">
                 <form onSubmit={handleGiveLoan} className="space-y-5">
                   <div>
                     <label className="block text-sm font-bold text-gray-900 mb-2">Select Member</label>
-                    <select
+                    <SearchableMemberSelect
+                      members={membersAvailableForLoan}
                       value={selectedMember}
-                      onChange={(e) => setSelectedMember(e.target.value)}
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200"
-                      required
-                    >
-                      <option value="">Choose a member</option>
-                      {membersAvailableForLoan.map(m => (
-                        <option key={m.id} value={m.id}>{m.id} - {m.name}</option>
-                      ))}
-                    </select>
+                      onChange={setSelectedMember}
+                      placeholder="Choose a member"
+                    />
                   </div>
 
                   <div>
@@ -288,7 +327,7 @@ const remaining = getRemainingDistributionForMonth(selectedMonth, selectedYear);
                   <div className="flex gap-3 pt-2">
                     <button
                       type="button"
-                      onClick={() => setShowForm(false)}
+                      onClick={() => { setShowForm(false); setBulkMode(false); }}
                       className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-colors duration-200"
                     >
                       Cancel
@@ -302,6 +341,108 @@ const remaining = getRemainingDistributionForMonth(selectedMonth, selectedYear);
                     </button>
                   </div>
                 </form>
+              </div>
+            )}
+
+            {showForm && bulkMode && (
+              <div className="p-6">
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-bold text-gray-900">Select Members</label>
+                    <button
+                      type="button"
+                      onClick={() => setBulkMode(false)}
+                      className="text-xs text-orange-600 font-semibold hover:text-orange-700"
+                    >
+                      Switch to single mode
+                    </button>
+                  </div>
+
+                  <div>
+                    <div className="relative mb-3">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">₹</span>
+                      <input
+                        type="number"
+                        value={bulkAmount}
+                        onChange={(e) => {
+                          setBulkAmount(e.target.value);
+                          const val = e.target.value;
+                          setBulkMemberAmounts((prev) => {
+                            const next = { ...prev };
+                            for (const id of bulkSelected) {
+                              if (!next[id]) next[id] = val;
+                            }
+                            return next;
+                          });
+                        }}
+                        placeholder="Shared loan amount"
+                        className="w-full pl-8 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200"
+                        min="1"
+                        max={Math.max(0, remaining)}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Max available: {formatINR(Math.max(0, remaining))}
+                    </p>
+                  </div>
+
+                  <div className="border border-gray-200 rounded-xl max-h-[240px] overflow-y-auto bg-gray-50">
+                    {filterMembers(membersAvailableForLoan, '').length === 0 ? (
+                      <div className="p-4 text-center text-sm text-gray-400">
+                        No members available
+                      </div>
+                    ) : (
+                      <MemberCheckboxList
+                        members={membersAvailableForLoan}
+                        selected={bulkSelected}
+                        onToggle={(id) => {
+                          setBulkSelected((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(id)) next.delete(id);
+                            else next.add(id);
+                            return next;
+                          });
+                          setBulkMemberAmounts((prev) => {
+                            if (!prev[id] && bulkAmount) {
+                              return { ...prev, [id]: bulkAmount };
+                            }
+                            return prev;
+                          });
+                        }}
+                        memberAmounts={bulkMemberAmounts}
+                        onAmountChange={(id, val) => {
+                          setBulkMemberAmounts((prev) => ({ ...prev, [id]: val }));
+                        }}
+                      />
+                    )}
+                  </div>
+
+                  {bulkSelected.size > 0 && (
+                    <div className="bg-orange-50 border border-orange-200 rounded-xl p-3">
+                      <p className="text-xs font-semibold text-orange-800">
+                        {bulkSelected.size} member(s) selected
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => { setShowForm(false); setBulkMode(false); setBulkSelected(new Set()); setBulkAmount(''); setBulkMemberAmounts({}); }}
+                      className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-colors duration-200"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleBulkDistribute}
+                      disabled={submitting || bulkSelected.size === 0 || !bulkAmount}
+                      className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl text-sm font-semibold hover:from-orange-600 hover:to-red-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {submitting ? 'Distributing...' : `Distribute to ${bulkSelected.size}`}
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 

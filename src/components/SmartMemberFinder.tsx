@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Search } from "lucide-react";
 
 import type { Member } from "@/types";
+import { filterMembers } from "@/lib/utils";
 
 type FinderMode = "groups" | "all";
 
@@ -23,14 +24,6 @@ interface SmartMemberFinderProps {
 function numericMemberId(member: Member) {
   const value = Number(member.id);
   return Number.isFinite(value) ? value : null;
-}
-
-function normalize(value: string) {
-  return value.trim().toLocaleLowerCase();
-}
-
-function normalizePhone(value: string) {
-  return value.replace(/\D/g, "");
 }
 
 export type { FinderMode };
@@ -61,22 +54,7 @@ export function SmartMemberFinder({
   );
 
   const filteredMembers = useMemo(() => {
-    const query = normalize(searchQuery);
-    const phoneQuery = normalizePhone(searchQuery);
-
-    if (!query) return sortedMembers;
-
-    return sortedMembers.filter((member) => {
-      const id = normalize(member.id);
-      const name = normalize(member.name);
-      const phone = normalizePhone(member.phone || "");
-
-      return (
-        id.includes(query) ||
-        name.includes(query) ||
-        (!!phoneQuery && phone.includes(phoneQuery))
-      );
-    });
+    return filterMembers(sortedMembers, searchQuery);
   }, [searchQuery, sortedMembers]);
 
   const groups = useMemo(() => {

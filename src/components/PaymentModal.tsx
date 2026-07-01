@@ -3,6 +3,7 @@ import { ChitFundError, useChitFund } from '../context/ChitFundContext';
 import { toast } from 'sonner';
 import { formatINR } from '@/lib/utils';
 import { X } from 'lucide-react';
+import { MONTHS } from '@/types';
 
 interface PaymentModalProps {
   memberId: string;
@@ -18,6 +19,7 @@ export function PaymentModal({ memberId, month, year, onClose }: PaymentModalPro
     hasMemberPaid,
     getMemberOutstandingBalance,
     getContributionAmount,
+    deletePayment,
   } = useChitFund();
   const [principalPaid, setPrincipalPaid] = useState('0');
 
@@ -183,12 +185,30 @@ export function PaymentModal({ memberId, month, year, onClose }: PaymentModalPro
               <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 text-center">
                 <p className="text-sm font-semibold text-emerald-700">Payment already recorded for this month</p>
               </div>
-              <button
-                onClick={onClose}
-                className="admin-button admin-press mt-4 w-full border border-slate-200 bg-white px-4 py-3 text-slate-600 hover:bg-slate-50"
-              >
-                Close
-              </button>
+              <div className="flex flex-col sm:flex-row gap-3 mt-4">
+                <button
+                  onClick={onClose}
+                  className="admin-button admin-press flex-1 border border-slate-200 bg-white px-4 py-3 text-slate-600 hover:bg-slate-50"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!window.confirm(`Undo payment for ${member.name} (${MONTHS[month - 1]} ${year})?`)) return;
+                    try {
+                      await deletePayment(memberId, month, year);
+                      toast.success('Payment undone');
+                      onClose();
+                    } catch (error) {
+                      console.error(error);
+                      toast.error('Could not undo payment');
+                    }
+                  }}
+                  className="admin-button admin-press flex-1 border border-red-200 bg-red-50 px-4 py-3 text-red-700 hover:bg-red-100"
+                >
+                  Undo Payment
+                </button>
+              </div>
             </div>
           )}
         </div>

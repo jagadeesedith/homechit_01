@@ -13,6 +13,9 @@ import {
   X,
   User,
   ChevronDown,
+  AlertTriangle,
+  BarChart3,
+  Trophy,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -28,9 +31,9 @@ const navItems = [
     icon: CalendarRange
   },
   {
-    path: '/member-history',
-    label: 'Member History',
-    icon: History
+    path: '/overdue',
+    label: 'Overdue Report',
+    icon: AlertTriangle
   },
   {
     path: '/distribution',
@@ -38,9 +41,24 @@ const navItems = [
     icon: HandCoins
   },
   {
+    path: '/member-history',
+    label: 'Member History',
+    icon: History
+  },
+  {
     path: '/members',
     label: 'Member List',
     icon: Users
+  },
+  {
+    path: '/analytics',
+    label: 'Analytics',
+    icon: BarChart3
+  },
+  {
+    path: '/maturity',
+    label: 'Maturity',
+    icon: Trophy
   },
   {
     path: '/settings',

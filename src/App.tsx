@@ -9,6 +9,9 @@ import { DistributionPage } from '@/pages/DistributionPage';
 import { MemberListPage } from '@/pages/MemberListPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { DownloadCenterPage } from '@/pages/DownloadCenterPage';
+import { OverduePage } from '@/pages/OverduePage';
+import { AnalyticsPage } from '@/pages/AnalyticsPage';
+import { MaturityPage } from '@/pages/MaturityPage';
 import { Toaster } from '@/components/ui/sonner';
 
 export default function App() {
@@ -62,6 +65,30 @@ export default function App() {
           element={
             <ProtectedRoute>
               <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/overdue"
+          element={
+            <ProtectedRoute>
+              <OverduePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute>
+              <AnalyticsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/maturity"
+          element={
+            <ProtectedRoute>
+              <MaturityPage />
             </ProtectedRoute>
           }
         />

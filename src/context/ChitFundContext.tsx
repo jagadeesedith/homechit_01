@@ -53,6 +53,7 @@ type Action =
   | { type: "ADD_DISTRIBUTION"; payload: Distribution }
   | { type: "DELETE_DISTRIBUTION"; payload: string }
   | { type: "MARK_ALL_PAID"; payload: MonthlyPayment[] }
+  | { type: "DELETE_PAYMENT"; payload: string }
   | { type: "UPDATE_SETTINGS"; payload: Settings };
 
 const defaultSettings: Settings = {
@@ -147,6 +148,12 @@ function reducer(state: State, action: Action): State {
       return { ...state, distributions: newDistributions };
     }
 
+    case "DELETE_PAYMENT": {
+      const payments = state.payments.filter(
+        (p) => p.id !== action.payload,
+      );
+      return { ...state, payments };
+    }
     case "UPDATE_SETTINGS": {
       return { ...state, settings: action.payload };
     }
@@ -200,6 +207,7 @@ interface ContextValue {
     amount: number,
   ) => Promise<void>;
   deleteDistribution: (distributionId: string) => Promise<void>;
+  deletePayment: (memberId: string, month: number, year: number) => Promise<void>;
   updateSettings: (settings: Settings) => Promise<void>;
 
   getMemberPayments: (memberId: string) => MonthlyPayment[];
@@ -1036,6 +1044,24 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "DELETE_DISTRIBUTION", payload: distributionId });
   };
 
+  const deletePayment = async (
+    memberId: string,
+    month: number,
+    year: number,
+  ) => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const paymentId = paymentDocId(memberId, month, year);
+
+    const batch = writeBatch(db);
+    batch.delete(doc(db, "users", user.uid, "payments", paymentId));
+    await batch.commit();
+
+    dispatch({ type: "DELETE_PAYMENT", payload: paymentId });
+    await reloadFromFirestore();
+  };
+
   const updateSettings = async (settings: Settings) => {
     const user = auth.currentUser;
     if (!user) return;
@@ -1066,6 +1092,7 @@ export function ChitFundProvider({ children }: { children: ReactNode }) {
         markMembersPaidForMonth,
         addDistribution,
         deleteDistribution,
+        deletePayment,
         updateSettings,
         getMemberPayments,
         getMonthPayments,

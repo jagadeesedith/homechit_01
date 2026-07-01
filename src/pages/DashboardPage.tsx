@@ -18,8 +18,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { MONTHS } from "@/types";
 import { useChitFund } from "../context/ChitFundContext";
-import { Calendar, ChevronDown, Users, TrendingUp } from "lucide-react";
+import { Calendar, Users, TrendingUp } from "lucide-react";
 import { RadialMemberDial } from "@/components/RadialMemberDial";
+import { MonthYearPicker } from "@/components/MonthYearPicker";
 import { toast } from "sonner";
 
 export function DashboardPage() {
@@ -176,12 +177,6 @@ export function DashboardPage() {
     }
   };
 
-  const currentYear = new Date().getFullYear();
-  const minYear = Math.min(2024, state.settings.startYear, currentYear - 2);
-  const maxYear = Math.max(currentYear + 5, state.settings.startYear + 5);
-  const years: number[] = [];
-  for (let y = minYear; y <= maxYear; y += 1) years.push(y);
-
   return (
     <div className="pt-16 lg:pt-0">
       {/* Header Section */}
@@ -214,37 +209,14 @@ export function DashboardPage() {
           </div>
 
           <div className="flex flex-wrap gap-3">
-            {/* Month Selector */}
-            <div className="relative">
-              <select
-                value={month}
-                onChange={(e) => setSelectedMonthYear(Number(e.target.value), year)}
-                className="admin-input appearance-none px-4 py-3 pr-10 text-sm font-medium text-gray-700 hover:border-gray-300"
-              >
-                {MONTHS.map((m, index) => (
-                  <option key={m} value={index + 1}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-            </div>
-
-            {/* Year Selector */}
-            <div className="relative">
-              <select
-                value={year}
-                onChange={(e) => setSelectedMonthYear(month, Number(e.target.value))}
-                className="admin-input appearance-none px-4 py-3 pr-10 text-sm font-medium text-gray-700 hover:border-gray-300"
-              >
-                {years.map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-            </div>
+            <MonthYearPicker
+              month={month}
+              year={year}
+              onChange={(m, y) => setSelectedMonthYear(m, y)}
+              startYear={state.settings.startYear}
+              monthSelectClassName="admin-input"
+              yearSelectClassName="admin-input"
+            />
 
             {/* Install App */}
             <a
