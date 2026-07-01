@@ -31,7 +31,6 @@ jobs:
       - name: Add Android platform
         run: |
           npm install @capacitor/android
-          npx cap add android
           npx cap sync
 
       - name: Build APK
